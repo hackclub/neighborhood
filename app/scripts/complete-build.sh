@@ -9,9 +9,9 @@ set -e  # Exit on any error
 # Configuration
 APP_NAME="Neighborhood"
 APP_PATH="out/${APP_NAME}-darwin-arm64/${APP_NAME}.app"
-APPLE_ID="tstubblefield487@icloud.com"
-APP_SPECIFIC_PASSWORD="bdhs-blrj-alnz-magr"
-TEAM_ID="2H4LMN3ZLG"
+APPLE_ID=""
+APP_SPECIFIC_PASSWORD=""
+TEAM_ID=""
 ENTITLEMENTS="entitlements-minimal.plist"
 DMG_NAME="${APP_NAME}.dmg"
 TMP_DMG_DIR="tmp_dmg_dir"
