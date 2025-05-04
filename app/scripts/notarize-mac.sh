@@ -6,9 +6,9 @@
 set -e  # Exit on any error
 
 APP_PATH=${1:-"out/Neighborhood-darwin-arm64/Neighborhood.app"}
-APP_SPECIFIC_PASSWORD="bdhs-blrj-alnz-magr"
-TEAM_ID="2H4LMN3ZLG"
-APPLE_ID="tstubblefield487@icloud.com"  # Hardcoded Apple ID
+APP_SPECIFIC_PASSWORD=""
+TEAM_ID=""
+APPLE_ID=""  # Hardcoded Apple ID
 
 # Ensure the app exists
 if [ ! -d "$APP_PATH" ]; then
