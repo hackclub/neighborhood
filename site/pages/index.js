@@ -468,7 +468,13 @@ export default function Home() {
           alignItems: 'center',
           zIndex: 1000
         }} onClick={() => setShowLetter(false)}>
-          <div style={{
+        </div>
+        <div style={{
+            position: 'fixed',
+            top: 50%;
+            left: 50%;
+            -ms-transform: translate(-50%, -50%);
+            transform: translate(-50%, -50%);
             width: '100%',
             maxWidth: '700px',
             backgroundColor: "#fff",
@@ -512,7 +518,6 @@ export default function Home() {
               </p> */}
               {/* <p style={{transform: "rotate(-0.4deg)", fontSize: "16px"}}><i>pssst... checkout <a style={{color: "#007C74", textDecoration: "underline"}} href="https://youtube.com/playlist?list=PLbNbddgD-XxH0TDS6qFynB6-YnWZU5Fhc&si=vMATC4c3VDzUuqwR">this documentary from Juice</a>, our popup game cafe in Shanghai, China</i></p> */}
           </div>
-        </div>
       )}
       {showVideo && (
         <div style={{
