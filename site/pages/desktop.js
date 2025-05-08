@@ -213,7 +213,7 @@ export default function Home() {
     { id: "start", text: "Start Hacking" },
     { id: "challenges", text: "Challenges" },
     { id: "bulletin", text: "Bulletin" },
-    { id: "sf_facts", text: "SF Fun Facts" },
+    // { id: "sf_facts", text: "SF Fun Facts" }, // removed from menu
     // { id: 'journal', text: 'Journal' },
     // { id: 'rewards', text: 'Rewards' }
   ];
@@ -884,11 +884,13 @@ export default function Home() {
                       </span>
                     </div>
 
-                    {/* Weather Icon */}
+                    {/* Weather Icon and SF Fun Facts Button */}
                     <div
                       className="weathericon"
                       style={{
                         height: "100%",
+                        display: "flex",
+                        alignItems: "center",
                       }}
                     >
                       <img
@@ -898,6 +900,24 @@ export default function Home() {
                         }}
                         src={weatherTexture}
                       />
+                      <button
+                        onClick={() => setUIPage("sf_facts")}
+                        style={{
+                          padding: "8px 16px",
+                          fontFamily: "M PLUS Rounded 1c",
+                          fontSize: "24px",
+                          border: "1px solid #FFF9E6",
+                          background: "none",
+                          cursor: "pointer",
+                          backgroundColor: "#007C74",
+                          color: "#FFF9E6",
+                          fontWeight: "bold",
+                          borderRadius: "8px",
+                          marginLeft: 16,
+                        }}
+                      >
+                        SF Fun Facts
+                      </button>
                     </div>
                   </div>
                 </div>
