@@ -23,6 +23,28 @@ const NeighborhoodEnvironment = dynamic(
 );
 
 export default function Home() {
+  const funFacts = [
+    "🌉 The Golden Gate Bridge isn’t actually golden—it's international orange!",
+    "💡 Alcatraz was the first US lighthouse on the West Coast.",
+    "⛰️ SF is built on more than 50 hills!",
+    "🥠 Fortune cookies were invented here, not China.",
+    "🧧 SF has the second largest Chinatown outside of Asia.",
+    "🌳 There are more than 200 parks in San Francisco.",
+    "🚋 SF is home to the oldest cable car system in the world.",
+    "🐟 It’s illegal to own a pet goldfish in San Francisco.",
+    "🏘️ SF has the largest collection of Victorian houses in the world.",
+    "🌫️ There are more than 300 days of fog in SF each year.",
+    "🎨 SF is home to the famous Painted Ladies, a row of colorful Victorian houses.",
+    "🍞 SF is known for its sourdough bread, which has a unique flavor due to the local wild yeast.",
+  ];
+  const [sfFact, setSfFact] = useState(funFacts[Math.floor(Math.random() * funFacts.length)]);
+  const getNextFact = () => {
+    let newFact;
+    do {
+      newFact = funFacts[Math.floor(Math.random() * funFacts.length)];
+    } while (newFact === sfFact);
+    setSfFact(newFact);
+  };
   const [UIPage, setUIPage] = useState("");
   const [hasEnteredNeighborhood, setHasEnteredNeighborhood] = useState(false);
   const [selectedItem, setSelectedItem] = useState("start");
@@ -231,7 +253,7 @@ export default function Home() {
     { id: "start", text: "Start Hacking" },
     { id: "challenges", text: "Challenges" },
     { id: "bulletin", text: "Bulletin" },
-
+    // { id: "sf_facts", text: "SF Fun Facts" }, // removed from menu
     // { id: 'journal', text: 'Journal' },
     // { id: 'rewards', text: 'Rewards' }
   ];
@@ -353,6 +375,79 @@ export default function Home() {
                 setUIPage={setUIPage}
                 isMuted={isMuted}
               />
+            )}
+            {(UIPage == "sf_facts" || (isExiting && UIPage === "sf_facts")) && (
+              <div
+                style={{
+                  backgroundColor: "#F5F7E1",
+                  padding: 32,
+                  borderRadius: 12,
+                  maxWidth: 600,
+                  margin: "auto",
+                  marginTop: 100,
+                  fontFamily: "M PLUS Rounded 1c",
+                  color: "#222",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  textAlign: "center",
+                }}
+              >
+                <h2
+                  style={{
+                    fontFamily: "M PLUS Rounded 1c",
+                    fontWeight: "bold",
+                    fontSize: 32,
+                    marginBottom: 24,
+                  }}
+                >
+                  Did you know?
+                </h2>
+                <p
+                  style={{
+                    fontSize: 22,
+                    lineHeight: "1.6",
+                    marginBottom: 24,
+                    minHeight: 64,
+                  }}
+                >
+                  {sfFact}
+                </p>
+                <div style={{ display: "flex", gap: 16 }}>
+                  <button
+                    onClick={getNextFact}
+                    style={{
+                      backgroundColor: "#007C74",
+                      color: "#FFF9E6",
+                      padding: "8px 16px",
+                      border: "1px solid #FFF9E6",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      fontFamily: "M PLUS Rounded 1c",
+                      fontSize: 18,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Next
+                  </button>
+                  <button
+                    onClick={handleCloseComponent}
+                    style={{
+                      backgroundColor: "#000",
+                      color: "#FFF9E6",
+                      padding: "8px 16px",
+                      border: "1px solid #FFF9E6",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                      fontFamily: "M PLUS Rounded 1c",
+                      fontSize: 18,
+                      fontWeight: "bold",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             )}
           </div>
           {!hasEnteredNeighborhood && (
@@ -1099,11 +1194,13 @@ export default function Home() {
                       </span>
                     </div>
 
-                    {/* Weather Icon */}
+                    {/* Weather Icon and SF Fun Facts Button */}
                     <div
                       className="weathericon"
                       style={{
                         height: "100%",
+                        display: "flex",
+                        alignItems: "center",
                       }}
                     >
                       <img
@@ -1113,6 +1210,24 @@ export default function Home() {
                         }}
                         src={weatherTexture}
                       />
+                      <button
+                        onClick={() => setUIPage("sf_facts")}
+                        style={{
+                          padding: "8px 16px",
+                          fontFamily: "M PLUS Rounded 1c",
+                          fontSize: "24px",
+                          border: "1px solid #FFF9E6",
+                          background: "none",
+                          cursor: "pointer",
+                          backgroundColor: "#007C74",
+                          color: "#FFF9E6",
+                          fontWeight: "bold",
+                          borderRadius: "8px",
+                          marginLeft: 16,
+                        }}
+                      >
+                        SF Fun Facts
+                      </button>
                     </div>
                   </div>
                 </div>
