@@ -213,7 +213,7 @@ export default function Home() {
     { id: "start", text: "Start Hacking" },
     { id: "challenges", text: "Challenges" },
     { id: "bulletin", text: "Bulletin" },
-
+    { id: "sf_facts", text: "SF Fun Facts" },
     // { id: 'journal', text: 'Journal' },
     // { id: 'rewards', text: 'Rewards' }
   ];
@@ -317,6 +317,48 @@ export default function Home() {
                 setUIPage={setUIPage}
                 isMuted={isMuted}
               />
+            )}
+            {(UIPage == "sf_facts" || (isExiting && UIPage === "sf_facts")) && (
+              <div
+                style={{
+                  backgroundColor: "#F5F7E1",
+                  padding: 32,
+                  borderRadius: 12,
+                  maxWidth: 600,
+                  margin: "auto",
+                  marginTop: 100,
+                  fontFamily: "M PLUS Rounded 1c",
+                  color: "#222",
+                }}
+              >
+                <h2 style={{ fontFamily: "M PLUS Rounded 1c", fontWeight: "bold", fontSize: 28, marginBottom: 16 }}>
+                  San Francisco Fun Facts
+                </h2>
+                <ul style={{ fontSize: 20, lineHeight: "1.6", paddingLeft: 24 }}>
+                  <li>The Golden Gate Bridge isn’t actually golden—it's international orange!</li>
+                  <li>Alcatraz was the first US lighthouse on the West Coast.</li>
+                  <li>SF is built on more than 50 hills!</li>
+                  <li>Fortune cookies were invented here, not China.</li>
+                  <li>SF has the second largest Chinatown outside of Asia.</li>
+                </ul>
+                <button
+                  onClick={handleCloseComponent}
+                  style={{
+                    marginTop: 24,
+                    backgroundColor: "#000",
+                    color: "#FFF9E6",
+                    padding: "8px 16px",
+                    border: "1px solid #FFF9E6",
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    fontFamily: "M PLUS Rounded 1c",
+                    fontSize: 18,
+                    fontWeight: "bold",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
             )}
           </div>
           {!hasEnteredNeighborhood && (
