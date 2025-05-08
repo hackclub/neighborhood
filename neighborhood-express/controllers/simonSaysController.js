@@ -16,16 +16,13 @@ class SimonSaysController {
   }
 
   startGame() {
-    console.log('[SimonSays] Starting game...');
     this.gameActive = true;
     this.players.clear();
     const command = this.issueNewCommand();
-    console.log('[SimonSays] First command:', command);
     return command; // Return the new command
   }
 
   stopGame() {
-    console.log('[SimonSays] Stopping game...');
     this.gameActive = false;
     if (this.commandTimeout) {
       clearTimeout(this.commandTimeout);
@@ -35,7 +32,6 @@ class SimonSaysController {
 
   issueNewCommand() {
     if (!this.gameActive) {
-      console.log('[SimonSays] Game not active, not issuing command');
       return null;
     }
 
@@ -52,12 +48,8 @@ class SimonSaysController {
       playersCompleted: new Set()
     };
 
-    console.log('[SimonSays] New command issued:', this.currentCommand.text, 'at', new Date().toISOString());
-
     // Set timeout for next command
-    console.log(`[SimonSays] Setting timeout for ${this.commandDuration}ms`);
     this.commandTimeout = setTimeout(() => {
-      console.log('[SimonSays] Command timeout triggered, issuing new command...');
       this.issueNewCommand();
     }, this.commandDuration);
 
@@ -69,11 +61,6 @@ class SimonSaysController {
 
     const command = this.currentCommand;
     const key = command.key;
-    
-    // Check if the player already completed this command
-    if (command.playersCompleted.has(playerId)) {
-      return null; // Player already completed this command, no update needed
-    }
     
     // Initialize attempts tracking
     if (!command.playerAttempts) {

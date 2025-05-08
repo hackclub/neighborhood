@@ -36,6 +36,19 @@ export default function PlayerModel({
   const toonGradient = useMemo(() => createToonGradient(), []);
   const onLoadCalledRef = useRef(false);
   
+  // Initialize socket connection as early as possible
+  useEffect(() => {
+    // Ensure socket is connected when the component mounts
+    if (!socketManager.connected) {
+      console.log('Initializing socket connection from PlayerModel');
+      socketManager.connect();
+    }
+    
+    return () => {
+      // No need to disconnect on unmount - keep connection alive
+    };
+  }, []);
+  
   // Load the model using useGLTF hook
   const { scene: rawModel, animations } = useGLTF('/models/player.glb');
   
@@ -73,7 +86,7 @@ export default function PlayerModel({
   const lastPhysicsUpdate = useRef(0);
   const lastNetworkUpdate = useRef(0);
   const PHYSICS_UPDATE_INTERVAL = 1000 / 60; // Target 60 fps for physics
-  const NETWORK_UPDATE_INTERVAL = 1000 / 20; // Target 20 fps for network updates
+  const NETWORK_UPDATE_INTERVAL = 1000 / 10; // Reduced from 20 to 10 fps for network updates
   
   // Cache vectors to prevent garbage collection
   const moveDir = useMemo(() => new THREE.Vector3(), []);
@@ -229,7 +242,6 @@ export default function PlayerModel({
     
     // Only configure animations once
     if (!onLoadCalledRef.current) {
-      log('Configuring animations');
       [idleAnimName, runAnimName].forEach(name => {
         const action = actions[name];
         action.loop = THREE.LoopRepeat;
@@ -239,9 +251,9 @@ export default function PlayerModel({
       actions[idleAnimName].play();
       currentAnimRef.current = 'idle';
       
-      log('Calling onLoad callback');
-      onLoad?.();
+      // Call onLoad to signal component is ready
       onLoadCalledRef.current = true;
+      onLoad?.();
     }
   }, [playerModel, actions, mixer, onLoad]);
   
@@ -520,7 +532,7 @@ export default function PlayerModel({
         containerRef.current.position.set(pos.x, pos.y, pos.z);
       }
 
-      // Send position and movement state updates to server
+      // Send position and movement state updates to server less frequently
       if (shouldUpdateNetwork && hasEnteredNeighborhood) {
         lastNetworkUpdate.current = now;
         
@@ -532,20 +544,14 @@ export default function PlayerModel({
         const position = { x: pos.x, y: pos.y, z: pos.z };
         const isMoving = moveState.w || moveState.s || moveState.a || moveState.d;
         
-        // Only send updates if socket is connected
-        if (socketManager.connected) {
-          // log('Sending position update:', {
-          //   position,
-          //   quaternion: {
-          //     x: quaternion.x,
-          //     y: quaternion.y,
-          //     z: quaternion.z,
-          //     w: quaternion.w
-          //   },
-          //   isMoving,
-          //   moveState
-          // });
+        // Only send updates if socket is connected and player is moving or position changed significantly
+        const player = socketManager.players.get(socketManager.socket?.id);
+        const hasPositionChanged = !player || 
+          Math.abs(player.position.x - position.x) > 0.1 || 
+          Math.abs(player.position.y - position.y) > 0.1 || 
+          Math.abs(player.position.z - position.z) > 0.1;
           
+        if (socketManager.connected && (isMoving || hasPositionChanged)) {
           socketManager.updateTransform(
             position,
             { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w },

@@ -47,7 +47,7 @@ class SocketManager {
     }
   }
 
-  connect() {
+  connect(playerInfo = {}) {
     if (this.socket) {
       this.log('Disconnecting previous socket before reconnecting');
       this.socket.disconnect();
@@ -58,7 +58,11 @@ class SocketManager {
     this._connectionAttempts++;
     
     // Use the Hack Club selfhosted URL
-    const socketUrl = 'wss://vgso8kg840ss8cok4s4cwwgk.a.selfhosted.hackclub.com';
+    // For development vs production
+    const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
+    const socketUrl = isProduction 
+      ? 'https://vgso8kg840ss8cok4s4cwwgk.a.selfhosted.hackclub.com'
+      : 'https://vgso8kg840ss8cok4s4cwwgk.a.selfhosted.hackclub.com';
     
     this.log(`Using socket URL: ${socketUrl} (attempt ${this._connectionAttempts})`);
     
@@ -70,42 +74,47 @@ class SocketManager {
         this.log('WARNING: Browser does not support WebSocket API!');
       }
       
-      // Log browser info
-      if (typeof navigator !== 'undefined') {
-        this.log(`Browser: ${navigator.userAgent}`);
-      }
+      const { name, profilePicture } = playerInfo;
       
-      // Force polling transport only to avoid WebSocket issues
+      // Use both transports with WebSocket preferred
       this.socket = io(socketUrl, {
-        transports: ['polling'],
-        reconnection: false, // We'll handle reconnection manually
-        timeout: 20000,
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 10000,
         forceNew: true,
-        // Add query parameters for debugging
+        path: '/socket.io',
         query: {
           clientId: `client_${Date.now()}`,
-          userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown'
+          name: name || '',
+          profilePicture: profilePicture || ''
         }
       });
+      
+      // Save player info for later use - don't clear it until explicitly sent
+      if (name || profilePicture) {
+        this._updatePlayerInfoNextTransform = { name, profilePicture };
+      }
       
       this.log('Socket.io instance created:', !!this.socket);
     } catch (err) {
       this.log('Error creating Socket.io instance:', err);
       console.error('[SocketManager] Socket creation error:', err);
       
-      // Try to recover by scheduling another connection attempt
-      setTimeout(() => this.tryReconnect(), 5000);
+      setTimeout(() => this.tryReconnect(), 3000);
       return;
     }
 
-    // Set up a connection timeout
+    // Set up a shorter connection timeout
     const connectionTimeout = setTimeout(() => {
       if (!this.connected && this.socket) {
         this.log('Connection attempt timed out');
         this.socket.disconnect();
         this.tryReconnect();
       }
-    }, 10000);
+    }, 5000);
 
     this.setupEventHandlers(connectionTimeout);
     
@@ -188,20 +197,23 @@ class SocketManager {
       this._connectionAttempts = 0; // Reset counter on successful connection
       clearTimeout(connectionTimeout);
       this.log('Connected to server with ID:', this.socket.id);
-      this.log('Socket transport:', this.socket.io.engine.transport.name);
       this.onConnectionStatusChange?.(true);
       
-      // Request initial players data - important fix for player sync
-      this.log('Requesting initial player data');
+      // Request initial players data immediately on connection
       this.socket.emit('requestPlayers');
       
-      // Send initial transform to register ourselves on the server
+      // Send initial transform to register immediately - no delay
       if (typeof window !== 'undefined') {
-        this.log('Sending initial transform to register on server');
-        setTimeout(() => {
-          this._forceRegisterOnServer();
-          this.log('Initial transform sent');
-        }, 500); // Small delay to ensure connection is fully established
+        // Send player info first if available
+        if (this._updatePlayerInfoNextTransform) {
+          this.socket.emit('updatePlayerInfo', {
+            name: this._updatePlayerInfoNextTransform.name,
+            profilePicture: this._updatePlayerInfoNextTransform.profilePicture
+          });
+        }
+        
+        // Then send position
+        this._forceRegisterOnServer();
       }
       
       // Set up heartbeat for this connection
@@ -299,66 +311,126 @@ class SocketManager {
       clearInterval(this._heartbeatInterval);
     }
     
+    // First heartbeat immediately to ensure quick registration
+    if (this.socket && this.connected) {
+      this.socket.emit('heartbeat');
+    }
+    
     // Set up a new heartbeat
     this._heartbeatInterval = setInterval(() => {
       if (this.socket && this.connected) {
-        this.log('Sending heartbeat ping');
         this.socket.emit('heartbeat');
-        
-        // Also send a position update to ensure we stay registered
-        this._forceRegisterOnServer();
+        // Only send position update every other heartbeat to reduce traffic
+        if (Math.random() < 0.5) {
+          this._forceRegisterOnServer();
+        }
       } else {
         clearInterval(this._heartbeatInterval);
         this._heartbeatInterval = null;
       }
-    }, 5000);
+    }, 15000); // Increased interval to reduce network traffic
   }
   
   _forceRegisterOnServer() {
     if (!this.socket || !this.connected) {
-      this.log('Cannot send force register - not connected');
       return;
     }
     
     try {
-      this.log('Forcing player registration');
-      this.socket.emit('updateTransform', {
+      // Always include player info in the initial transform
+      const transformData = {
         position: { x: 0, y: 0, z: 0 },
         quaternion: { x: 0, y: 0, z: 0, w: 1 },
         isMoving: false,
         moveState: { w: false, a: false, s: false, d: false, space: false }
-      });
+      };
+      
+      // Include player info if it's set
+      if (this._updatePlayerInfoNextTransform) {
+        transformData.name = this._updatePlayerInfoNextTransform.name;
+        transformData.profilePicture = this._updatePlayerInfoNextTransform.profilePicture;
+      }
+      
+      this.socket.emit('updateTransform', transformData);
     } catch (err) {
       this.log('Error during force register:', err);
     }
   }
 
-  updateTransform(position, quaternion, isMoving, moveState) {
-    if (this.socket && this.connected) {
-      // Log the first update for debugging
-      if (!this._sentFirstUpdate) {
-        this.log('Sending first transform update:', {
-          position,
-          isMoving,
-          moveState
-        });
-        this._sentFirstUpdate = true;
-      }
+  // Method to update player information
+  updatePlayerInfo(name, profilePicture) {
+    if (!this.socket || !this.connected) {
+      this.log('Cannot update player info - not connected');
+      return false;
+    }
+    
+    try {
+      this.log(`Updating player info: name=${name}, has profile pic=${!!profilePicture}`);
+      this.socket.emit('updatePlayerInfo', {
+        name,
+        profilePicture
+      });
+      
+      // Also update the next transform with this info to ensure it propagates
+      this._updatePlayerInfoNextTransform = {
+        name,
+        profilePicture
+      };
+      
+      // Send repeated updates for the player info to ensure it gets through
+      setTimeout(() => {
+        if (this.socket && this.connected) {
+          this.log('Sending follow-up player info update');
+          this.socket.emit('updatePlayerInfo', {
+            name,
+            profilePicture
+          });
+        }
+      }, 1000);
+      
+      return true;
+    } catch (err) {
+      this.log('Error updating player info:', err);
+      return false;
+    }
+  }
 
-      this.socket.emit('updateTransform', {
+  updateTransform(position, quaternion, isMoving, moveState = {}) {
+    if (!this.socket || !this.connected) {
+      return false;
+    }
+    
+    if (!this._sentFirstUpdate) {
+      this.log('Sending first transform update');
+      this._sentFirstUpdate = true;
+    }
+    
+    try {
+      // Create transform data
+      const transformData = {
         position,
         quaternion,
         isMoving,
-        moveState: moveState || { w: false, a: false, s: false, d: false, space: false }
-      });
-    } else {
-      this.log('Cannot update transform - socket not connected');
+        moveState
+      };
       
-      // If socket exists but not connected, try reconnecting
-      if (this.socket && !this.connected) {
-        this.log('Not connected during updateTransform, attempting to reconnect...');
-        this.connect();
+      // Include player info if it was recently updated or hasn't been sent yet
+      if (this._updatePlayerInfoNextTransform) {
+        transformData.name = this._updatePlayerInfoNextTransform.name;
+        transformData.profilePicture = this._updatePlayerInfoNextTransform.profilePicture;
+        
+        // Keep sending player info in transforms for longer to ensure it propagates
+        // Only clear after many updates and with low probability
+        if (this._sentFirstUpdate && Math.random() < 0.05) { // Reduced from 0.2 to 0.05 (5% chance)
+          this._updatePlayerInfoNextTransform = null;
+        }
       }
+      
+      this.socket.emit('updateTransform', transformData);
+      return true;
+    } catch (err) {
+      this.log('Error updating transform:', err);
+      return false;
     }
   }
 

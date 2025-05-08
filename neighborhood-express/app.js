@@ -22,145 +22,62 @@ const app = express();
 app.set('trust proxy', true);
 
 const httpServer = http.createServer(app);
+const PORT = process.env.PORT || 3002;
+
+// Configure CORS to accept connections from any origin or specific origins
+const CORS_ORIGINS = process.env.CORS_ORIGINS || "*";
+const corsOrigins = CORS_ORIGINS === "*" ? "*" : CORS_ORIGINS.split(",");
+
 const ioServer = new Server(httpServer, {
   cors: {
-    origin: "*",
+    origin: corsOrigins,
     methods: ["GET", "POST", "OPTIONS"],
     credentials: true,
     allowedHeaders: ["Content-Type", "Authorization"]
   },
-  transports: ['polling', 'websocket'],
+  transports: ['websocket', 'polling'],
   allowEIO3: true,
-  pingTimeout: 60000,
-  pingInterval: 25000,
-  connectTimeout: 30000,
-  path: '/socket.io'
-});
-
-// Track raw socket connections at engine.io level
-ioServer.engine.on('connection', (rawSocket) => {
-  console.log(`[ENGINE] Raw socket connected: ${rawSocket.id}`);
-  
-  rawSocket.on('close', (reason) => {
-    console.log(`[ENGINE] Raw socket closed: ${rawSocket.id}, reason: ${reason}`);
-  });
-  
-  rawSocket.on('error', (err) => {
-    console.log(`[ENGINE] Raw socket error: ${rawSocket.id}, error: ${err.message}`);
-  });
-});
-
-// Debug players map state
-function logPlayersMap() {
-  console.log(`[APP] Current players (${players.size}):`);
-  if (players.size > 0) {
-    players.forEach((player, id) => {
-      console.log(`- Player ${id}: pos=${JSON.stringify(player.position)}`);
-    });
-  } else {
-    console.log('No players currently in the map');
-  }
-  
-  // Log current Socket.IO connections
-  console.log(`[APP] Socket.IO connected clients: ${ioServer.engine.clientsCount}`);
-  
-  try {
-    // Get detailed sockets info
-    const sockets = Array.from(ioServer.sockets.sockets);
-    console.log(`[APP] Socket.IO sockets count: ${sockets.length}`);
-    
-    if (sockets.length > 0) {
-      sockets.forEach(([id, socket]) => {
-        console.log(`- Socket ${id}: connected=${socket.connected}, rooms=${Array.from(socket.rooms).join(',')}`);
-      });
-    } else {
-      console.log('[APP] No Socket.IO sockets found in sockets map');
+  pingTimeout: 20000,
+  pingInterval: 10000,
+  connectTimeout: 10000,
+  path: '/socket.io',
+  maxHttpBufferSize: 1e6,
+  perMessageDeflate: {
+    threshold: 1024,
+    zlibDeflateOptions: {
+      level: 1
     }
-    
-    // Get raw engine clients
-    const engineSockets = Object.keys(ioServer.engine.clients || {});
-    console.log(`[APP] Engine sockets: ${engineSockets.length}`);
-    engineSockets.forEach(id => console.log(`- Engine socket: ${id}`));
-  } catch (err) {
-    console.error('[APP] Error getting socket details:', err);
   }
+});
+
+// Track raw socket connections - minimal logging
+ioServer.engine.on('connection', (rawSocket) => {
+  rawSocket.on('close', () => {});
+});
+
+// Simplified logging function for player state
+function logPlayersMap() {
+  console.log(`[APP] Players: ${players.size}, Connections: ${ioServer.engine.clientsCount}`);
 }
 
-// Set interval to log players state (more frequent for debugging)
-const logInterval = setInterval(logPlayersMap, 10000);
+// Less frequent logging interval
+const logInterval = setInterval(logPlayersMap, 300000); // Log every 5 minutes
 
 // Track client versions and connection issues
 const clientVersions = new Map();
 const connectionIssues = new Map();
 
-// Log middleware for all Socket.IO events
+// Log middleware - no verbose logging
 ioServer.use((socket, next) => {
-  console.log(`[MIDDLEWARE] Socket middleware running for ${socket.id}`);
-  
-  // Log all socket events
-  const onevent = socket.onevent;
-  socket.onevent = function(packet) {
-    const args = packet.data || [];
-    console.log(`[EVENT] Socket ${socket.id} event: ${args[0]} with ${args.length-1} args`);
-    onevent.call(this, packet);
-  };
-  
   next();
 });
 
 const players = new Map();
 
 ioServer.on('connection', (socket) => {
-  console.log(`[APP] Player socket connected: ${socket.id} (Total: ${ioServer.engine.clientsCount})`);
-  console.log(`[APP] Socket details: transport=${socket.conn?.transport?.name}, readyState=${socket.conn?.readyState}`);
-  
-  // Debug handshake
-  try {
-    console.log(`[APP] Socket handshake: address=${socket.handshake.address}, headers=${JSON.stringify(socket.handshake.headers['user-agent'])}`);
-    console.log(`[APP] Socket query params:`, socket.handshake.query);
-  } catch (err) {
-    console.log(`[APP] Error logging handshake: ${err.message}`);
-  }
-  
-  // Log immediate socket.io manager state
-  console.log(`[APP] Current socket.io state: engine clients=${ioServer.engine.clientsCount}, namespace clients=${ioServer.sockets.sockets.size}`);
-  
-  // Force socket into a room to track them
-  socket.join(`player:${socket.id}`);
-  console.log(`[APP] Added socket ${socket.id} to room player:${socket.id}`);
-  
-  // Handle client logs
-  socket.on('clientLog', (data) => {
-    console.log(`[CLIENT:${socket.id}] ${data.message}`);
-  });
-  
-  // Create a placeholder entry for the player
-  // This ensures they're in the players map even if they haven't moved yet
-  if (!players.has(socket.id)) {
-    console.log(`[APP] Creating placeholder entry for new player: ${socket.id}`);
-    // Check if socket exists and is connected 
-    console.log(`[APP] Socket ${socket.id} connected status: ${socket.connected}`);
-    
-    players.set(socket.id, {
-      position: { x: 0, y: 0, z: 0 },
-      quaternion: { x: 0, y: 0, z: 0, w: 1 },
-      isMoving: false,
-      lastUpdate: Date.now()
-    });
-    
-    // Log players map immediately after adding a player
-    console.log(`[APP] Players map now has ${players.size} players after adding ${socket.id}`);
-    for (const playerId of players.keys()) {
-      console.log(`[APP] - Player in map: ${playerId}`);
-    }
-    
-    // Double-check socket is in the server's socket list
-    const socketStillExists = ioServer.sockets.sockets.has(socket.id);
-    console.log(`[APP] Double-check: socket ${socket.id} exists in sockets map: ${socketStillExists}`);
-    
-    // Broadcast to all clients that a new player joined
-    ioServer.emit('playersUpdate', Array.from(players.entries()));
-  }
+  // Create a placeholder entry for the player immediately
+  const playerName = socket.handshake.query.name || "Player";
+  const profilePicture = socket.handshake.query.profilePicture || "";
   
   // Track connection issues
   connectionIssues.set(socket.id, {
@@ -170,29 +87,42 @@ ioServer.on('connection', (socket) => {
     heartbeatCount: 0
   });
   
-  // Debug emit
+  // If player not already in map, add them
+  if (!players.has(socket.id)) {
+    players.set(socket.id, {
+      position: { x: 0, y: 0, z: 0 },
+      quaternion: { x: 0, y: 0, z: 0, w: 1 },
+      isMoving: false,
+      lastUpdate: Date.now(),
+      name: playerName,
+      profilePicture: profilePicture
+    });
+    
+    // Send full player data to the new player first
+    socket.emit('playersUpdate', Array.from(players.entries()));
+    
+    // Then broadcast the new player to others with complete information
+    socket.broadcast.emit('playersUpdate', Array.from(players.entries()));
+    
+    // Send another update after a short delay to ensure everyone gets the latest info
+    setTimeout(() => {
+      ioServer.emit('playersUpdate', Array.from(players.entries()));
+    }, 2000);
+  }
+  
+  // Send debug message to confirm connection
   socket.emit('debug', { message: 'Server received your connection' });
   
   // Log all disconnection events
-  socket.on('disconnecting', (reason) => {
-    console.log(`[APP] Socket ${socket.id} disconnecting. Reason: ${reason}`);
-  });
+  socket.on('disconnecting', () => {});
   
-  socket.on('disconnect', (reason) => {
-    console.log(`[APP] Socket ${socket.id} disconnected. Reason: ${reason}`);
-    
+  socket.on('disconnect', () => {
     // Check if the player was in the map before removing
-    const wasInMap = players.has(socket.id);
-    
-    if (wasInMap) {
-      console.log(`[APP] Removing player ${socket.id} from players map`);
+    if (players.has(socket.id)) {
       players.delete(socket.id);
       
       // Broadcast to all remaining clients
-      console.log(`[APP] Broadcasting player removal. Remaining players: ${players.size}`);
       ioServer.emit('playersUpdate', Array.from(players.entries()));
-    } else {
-      console.log(`[APP] Player ${socket.id} was not in players map, nothing to remove`);
     }
     
     // Cleanup connection issues
@@ -203,7 +133,6 @@ ioServer.on('connection', (socket) => {
   if (simonSaysController.isGameActive()) {
     const currentCommand = simonSaysController.getCurrentCommand();
     if (currentCommand) {
-      console.log('[APP] Sending active Simon Says command to new player:', socket.id);
       socket.emit('simonSaysStarted', currentCommand);
     }
   }
@@ -219,34 +148,26 @@ ioServer.on('connection', (socket) => {
     issues.heartbeatCount++;
     connectionIssues.set(socket.id, issues);
     
-    // If this is the first heartbeat or every 10th heartbeat, log it
-    if (issues.heartbeatCount === 1 || issues.heartbeatCount % 10 === 0) {
-      console.log(`[APP] Heartbeat #${issues.heartbeatCount} received from player: ${socket.id}`);
-    }
-    
     // Respond with current player count
     socket.emit('heartbeatAck', { 
       playerCount: players.size,
       playerIds: Array.from(players.keys())
     });
+    
+    // Also send a full players update with each heartbeat to ensure data consistency
+    socket.emit('playersUpdate', Array.from(players.entries()));
   });
   
-  // Send current player state immediately and log it
-  console.log(`[APP] Sending playersUpdate to new player ${socket.id}. Current players: ${players.size}`);
-  socket.emit('playersUpdate', Array.from(players.entries()));
-  
-  // Handle explicit player data requests
+  // Handle immediate player data requests with high priority
   socket.on('requestPlayers', () => {
-    console.log(`[APP] Player ${socket.id} explicitly requested players data. Current players: ${players.size}`);
-    
-    // Update last activity time
-    const issues = connectionIssues.get(socket.id);
-    if (issues) {
-      issues.lastActivity = Date.now();
-      connectionIssues.set(socket.id, issues);
-    }
-    
     socket.emit('playersUpdate', Array.from(players.entries()));
+    
+    // Schedule another update shortly after to ensure data is received
+    setTimeout(() => {
+      if (socket.connected) {
+        socket.emit('playersUpdate', Array.from(players.entries()));
+      }
+    }, 1000);
   });
   
   socket.on('updateTransform', (data) => {
@@ -262,80 +183,39 @@ ioServer.on('connection', (socket) => {
     connectionIssues.set(socket.id, issues);
     
     if (wasNewPlayer) {
-      console.log(`[APP] Adding new player to map: ${socket.id}`);
       players.set(socket.id, {
         position: data.position,
         quaternion: data.quaternion,
         isMoving: data.isMoving,
-        lastUpdate: Date.now()
+        lastUpdate: Date.now(),
+        name: data.name || socket.handshake.query.name || "Player",
+        profilePicture: data.profilePicture || socket.handshake.query.profilePicture || ""
       });
+      
+      // When a new player joins, broadcast complete player data to everyone
+      ioServer.emit('playersUpdate', Array.from(players.entries()));
     } else {
       const player = players.get(socket.id);
       player.position = data.position;
       player.quaternion = data.quaternion;
       player.isMoving = data.isMoving;
       player.lastUpdate = Date.now();
-    }
-    
-    // Log the first transform update or every 100th update for a player
-    if (issues.updateCount === 1 || issues.updateCount % 100 === 0) {
-      console.log(`[APP] Transform update #${issues.updateCount} from player ${socket.id}:`, 
-        JSON.stringify({
-          pos: data.position,
-          isMoving: data.isMoving
-        })
-      );
-    }
-    
-    // Log players map when player count changes
-    if (wasNewPlayer) {
-      logPlayersMap();
-    }
-    
-    // Handle Simon Says if active
-    if (simonSaysController.isGameActive()) {
-      const moveState = data.moveState;
       
-      // Debug information
-      if (moveState && (moveState.w || moveState.a || moveState.s || moveState.d || moveState.space)) {
-        console.log('Player input:', { 
-          playerId: socket.id,
-          moveState: {
-            w: moveState.w,
-            a: moveState.a,
-            s: moveState.s,
-            d: moveState.d,
-            space: moveState.space
-          },
-          command: simonSaysController.getCurrentCommand().text
-        });
+      // Important: Always update player info if provided
+      if (data.name) player.name = data.name;
+      if (data.profilePicture) player.profilePicture = data.profilePicture;
+      
+      // Broadcast to all clients except sender
+      socket.broadcast.emit('playersUpdate', Array.from(players.entries()));
+      
+      // Every 5th update, also send a full sync to all clients including sender
+      if (Math.random() < 0.2) { // Increased from 10% to 20% for better sync
+        ioServer.emit('playersUpdate', Array.from(players.entries()));
       }
-      
-      const result = simonSaysController.validatePlayerMove(socket.id, moveState);
-      
-      // Only emit if there's a change in the player's status (success or failure)
-      if (result !== null) {
-        console.log('Simon Says result:', { playerId: socket.id, result });
-        ioServer.emit('simonSaysUpdate', {
-          command: simonSaysController.getCurrentCommand(),
-          playerId: socket.id,
-          success: result
-        });
-      }
-    }
-    
-    // Broadcast to all clients except sender
-    socket.broadcast.emit('playersUpdate', Array.from(players.entries()));
-    
-    // Every 5th update (or so), also send a full sync to all clients including sender
-    // This helps ensure that clients that missed updates get in sync
-    if (Math.random() < 0.2) { // ~20% chance to do a full sync
-      ioServer.emit('playersUpdate', Array.from(players.entries()));
     }
   });
 
   socket.on('startSimonSays', () => {
-    console.log('Starting Simon Says game');
     const firstCommand = simonSaysController.startGame();
     if (firstCommand) {
       ioServer.emit('simonSaysStarted', firstCommand);
@@ -343,23 +223,35 @@ ioServer.on('connection', (socket) => {
   });
 
   socket.on('stopSimonSays', () => {
-    console.log('Stopping Simon Says game');
     simonSaysController.stopGame();
     ioServer.emit('simonSaysStopped');
+  });
+
+  // Add endpoint to update player information
+  socket.on('updatePlayerInfo', (data) => {
+    if (players.has(socket.id)) {
+      const player = players.get(socket.id);
+      
+      if (data.name) player.name = data.name;
+      if (data.profilePicture) player.profilePicture = data.profilePicture;
+      
+      // Broadcast the updated player info
+      ioServer.emit('playersUpdate', Array.from(players.entries()));
+      
+      // Send it again after a short delay to ensure everyone gets it
+      setTimeout(() => {
+        ioServer.emit('playersUpdate', Array.from(players.entries()));
+      }, 2000);
+    }
   });
 });
 
 // Create a custom event emitter for command changes
 const origIssueNewCommand = simonSaysController.issueNewCommand;
 simonSaysController.issueNewCommand = function() {
-  console.log('[APP] Calling original issueNewCommand...');
   const command = origIssueNewCommand.call(this);
   if (command) {
-    console.log('[APP] Broadcasting new command:', command.text, 'with timestamp', command.timestamp);
-    console.log('[APP] Connected clients:', ioServer.engine.clientsCount);
     ioServer.emit('simonSaysCommand', command);
-  } else {
-    console.log('[APP] No command returned from issueNewCommand');
   }
   return command;
 };
@@ -417,7 +309,6 @@ const cleanupInterval = setInterval(() => {
   players.forEach((player, id) => {
     // If a player hasn't updated in 30 seconds, remove them
     if (now - player.lastUpdate > 30000) {
-      console.log(`[APP] Removing inactive player ${id} (last update: ${now - player.lastUpdate}ms ago)`);
       players.delete(id);
       cleanedUp++;
     }
@@ -438,58 +329,32 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
-// Add monitoring for server status
+// Add monitoring for server status - less frequent
 setInterval(() => {
   const memory = process.memoryUsage();
   console.log(`[MONITOR] Memory: rss=${Math.round(memory.rss/1024/1024)}MB, heap=${Math.round(memory.heapUsed/1024/1024)}/${Math.round(memory.heapTotal/1024/1024)}MB`);
   console.log(`[MONITOR] Connections: socket.io=${ioServer.engine.clientsCount}, players=${players.size}`);
-}, 60000);
+}, 300000); // Reduced to once every 5 minutes
 
-// Add direct health check for sockets
+// Simplified health check for sockets
 setInterval(() => {
-  console.log(`[HEALTH] Running socket health check...`);
+  // Only log issues if the player count and socket count mismatch significantly
   const socketCount = ioServer.sockets.sockets.size;
-  console.log(`[HEALTH] Socket.IO sockets count: ${socketCount}`);
+  if (Math.abs(socketCount - players.size) > 2) {
+    console.log(`[HEALTH] Socket/player count mismatch: sockets=${socketCount}, players=${players.size}`);
+  }
   
-  // Check each socket's connection
+  // Look for disconnected sockets still in players map
   ioServer.sockets.sockets.forEach((socket, id) => {
-    console.log(`[HEALTH] Socket ${id} connected: ${socket.connected}`);
-    
-    // If socket is connected but not in players map, add it
-    if (socket.connected && !players.has(id)) {
-      console.log(`[HEALTH] Found connected socket ${id} not in players map, adding it`);
-      players.set(id, {
-        position: { x: 0, y: 0, z: 0 },
-        quaternion: { x: 0, y: 0, z: 0, w: 1 },
-        isMoving: false,
-        lastUpdate: Date.now()
-      });
-      
-      // Broadcast updated player list
-      ioServer.emit('playersUpdate', Array.from(players.entries()));
+    if (!socket.connected && players.has(id)) {
+      console.log(`[HEALTH] Found disconnected socket still in players map: ${id}`);
+      players.delete(id);
     }
-    
-    // Check if the socket is in a room
-    const rooms = Array.from(socket.rooms);
-    console.log(`[HEALTH] Socket ${id} rooms: ${rooms.join(', ')}`);
   });
-  
-  // Check if engine clients match socket.io sockets
-  const engineClientCount = Object.keys(ioServer.engine.clients || {}).length;
-  console.log(`[HEALTH] Engine clients: ${engineClientCount}, Socket.IO sockets: ${socketCount}`);
-  
-  // Check if the right number of players are in the map
-  console.log(`[HEALTH] Players in map: ${players.size}`);
-}, 15000);
+}, 60000); // Check every minute
 
-httpServer.listen(3002, () => {
-  console.log('Server is running on port 3002');
-  console.log('Socket.IO configured with events:');
-  console.log('- simonSaysStarted');
-  console.log('- simonSaysStopped');
-  console.log('- simonSaysCommand');
-  console.log('- simonSaysUpdate');
-  console.log('- playersUpdate');
+httpServer.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
 });
 
-export { app };
+export { app, ioServer };

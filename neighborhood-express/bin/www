@@ -3,10 +3,9 @@
 /**
  * Module dependencies.
  */
-import { app } from "../app.js";
+import { app, ioServer } from "../app.js";
 import debug from "debug";
 import http from "http";
-import { Server } from "socket.io";
 import { setClientsReference } from "../routes/game.js";
 
 /**
@@ -17,21 +16,12 @@ var port = normalizePort(process.env.PORT || "3001");
 app.set("port", port);
 
 /**
- * Create HTTP server.
+ * NOTE: HTTP server and Socket.IO are now configured in app.js
+ * This file now only serves as a compatibility layer
  */
 
-var server = http.createServer(app);
-
-/**
- * Create Socket.IO server
- */
-const io = new Server(server, {
-  cors: {
-    origin: "http://localhost:3000",
-    methods: ["GET", "POST"],
-    credentials: true
-  }
-});
+// Socket.IO is now exported from app.js, no need to create a new one
+const io = ioServer;
 
 // Store connected clients
 const clients = new Map();
@@ -39,74 +29,8 @@ const clients = new Map();
 // Share clients reference with game routes
 setClientsReference(clients);
 
-// Socket.IO connection handler
-io.on('connection', (socket) => {
-  console.log(`Client connected: ${socket.id}`);
-  
-  // Add client to our map with default state
-  clients.set(socket.id, { 
-    id: socket.id,
-    position: { x: 0, y: 0, z: 0 },
-    quaternion: { x: 0, y: 0, z: 0, w: 1 }
-  });
-  
-  // Send the current players to the new client
-  socket.emit('players', Array.from(clients.values()));
-  
-  // Send the new player to all other clients
-  socket.broadcast.emit('playerJoined', clients.get(socket.id));
-  
-  // Handle position updates from clients
-  socket.on('updateTransform', (data) => {
-    // Update the client's stored state
-    const client = clients.get(socket.id);
-    if (client) {
-      // Update all client data
-      client.position = data.position;
-      client.quaternion = data.quaternion;
-      client.isMoving = data.isMoving;
-      
-      // Broadcast the update to all other clients
-      socket.broadcast.emit('playerMoved', {
-        id: socket.id,
-        position: client.position,
-        quaternion: client.quaternion,
-        isMoving: client.isMoving
-      });
-    }
-  });
-  
-  // Handle player interactions or events (e.g., shooting, picking up items)
-  socket.on('gameEvent', (data) => {
-    // Broadcast the event to all other clients
-    socket.broadcast.emit('gameEvent', {
-      id: socket.id,
-      ...data
-    });
-  });
-  
-  // Handle disconnection
-  socket.on('disconnect', () => {
-    console.log(`Client disconnected: ${socket.id}`);
-    
-    // Notify all clients that a player has left
-    io.emit('playerLeft', socket.id);
-    
-    // Remove client from our map
-    clients.delete(socket.id);
-  });
-});
-
 // Export io for potential external use
 export { io };
-
-/**
- * Listen on provided port, on all network interfaces.
- */
-
-server.listen(port);
-server.on("error", onError);
-server.on("listening", onListening);
 
 /**
  * Normalize a port into a number, string, or false.
@@ -159,8 +83,12 @@ function onError(error) {
  */
 
 function onListening() {
-  var addr = server.address();
+  var addr = io.httpServer.address();
   var bind = typeof addr === "string" ? "pipe " + addr : "port " + addr.port;
   debug("Listening on " + bind);
-  console.log(`Socket.IO server running on port ${port}`);
+  console.log(`Socket.IO server running on port ${addr.port}`);
 }
+
+// Register the listening handler on the existing server
+io.httpServer.on("listening", onListening);
+io.httpServer.on("error", onError);

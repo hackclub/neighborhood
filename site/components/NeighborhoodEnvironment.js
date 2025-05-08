@@ -5,6 +5,8 @@ import Scene from "./threejs/Scene";
 import { Physics } from "@react-three/rapier";
 import { Suspense } from "react";
 import { socketManager } from "../utils/socketManager";
+import { getToken } from "../utils/storage";
+import { updatePlayerInfoFromSlack } from "../utils/slack";
 
 function CameraController() {
   const { camera } = useThree();
@@ -32,11 +34,26 @@ export default function NeighborhoodEnvironment({
   const successTimeoutRef = useRef(null);
   const commandIdRef = useRef(0);
 
-  // Connect to Socket.IO when entering neighborhood
+  // Effect for socket connection and cleanup
   useEffect(() => {
     if (hasEnteredNeighborhood) {
+      console.log("[NeighborhoodEnvironment] Starting socket connection process...");
+      
       // Register callback handlers
       socketManager.onPlayersUpdate = (players) => {
+        console.log("[NeighborhoodEnvironment] Received players update, count:", players.size);
+        if (players.size > 0) {
+          // Debug log first player data
+          const firstPlayer = Array.from(players.entries())[0];
+          if (firstPlayer) {
+            console.log("[NeighborhoodEnvironment] Sample player data:", {
+              id: firstPlayer[0],
+              name: firstPlayer[1].name,
+              hasProfilePic: !!firstPlayer[1].profilePicture,
+              profilePicLength: firstPlayer[1].profilePicture?.length
+            });
+          }
+        }
         setOtherPlayers(new Map(players));
       };
       
@@ -149,28 +166,27 @@ export default function NeighborhoodEnvironment({
             // It's about us - update our state
             if (data.success === true) {
               // Success case - we got it right!
-              newState = {
-                ...prev,
-                command: data.command,
-                success: true,
-                playerId: data.playerId,
-                lastCorrectPlayerId: data.playerId,
-                currentPlayerState: 'success'
-              };
-            } else if (data.success === false) {
-              // Failure case - we got it wrong
-              // Don't overwrite success if we already succeeded
-              if (prev.currentPlayerState === 'success') {
-                newState = prev;
-              } else {
+              // Only update if we haven't failed for this command
+              if (prev.currentPlayerState !== 'failure') {
                 newState = {
                   ...prev,
                   command: data.command,
-                  success: false,
+                  success: true,
                   playerId: data.playerId,
-                  currentPlayerState: 'failure'
+                  lastCorrectPlayerId: data.playerId,
+                  currentPlayerState: 'success'
                 };
               }
+            } else if (data.success === false) {
+              // Failure case - we got it wrong
+              // Always update to failure state regardless of previous state
+              newState = {
+                ...prev,
+                command: data.command,
+                success: false,
+                playerId: data.playerId,
+                currentPlayerState: 'failure'
+              };
             }
           } else {
             // It's about another player - just update the command
@@ -184,34 +200,84 @@ export default function NeighborhoodEnvironment({
           return newState;
         });
         
-        // Set a timeout to clear the failure state after a delay
-        // but only if we just failed and haven't succeeded yet
-        if (data.playerId === socketManager.socket?.id && data.success === false) {
-          console.log("[NeighborhoodEnvironment] Setting failure timeout");
-          successTimeoutRef.current = setTimeout(() => {
-            setSimonSaysState(prev => {
-              // Only clear failure state, never clear success state
-              if (prev.currentPlayerState === 'failure') {
-                const newState = {
-                  ...prev,
-                  success: null,
-                  currentPlayerState: null
-                };
-                console.log("[NeighborhoodEnvironment] Clearing failure state:", newState);
-                return newState;
-              }
-              return prev;
-            });
-            successTimeoutRef.current = null;
-          }, 2000);
-        }
+        // Remove the timeout for clearing failure state - we want to keep it until next command
+        // The failure state will be cleared when a new command is issued instead
       };
       
-      // Connect to server
-      socketManager.connect();
+      // First get user data, then connect with that info
+      const token = getToken();
+      let cleanupTimer;
+      
+      if (token) {
+        console.log("[NeighborhoodEnvironment] Auth token found, retrieving user data...");
+        
+        // Initial connection - try to get user data first
+        (async () => {
+          try {
+            console.log('[NeighborhoodEnvironment] Attempting to get user data before connecting socket');
+            const { updateSlackUserData } = await import('../utils/slack');
+            const userData = await updateSlackUserData(token);
+            
+            // Extract name and profile image
+            const { name, profilePicture, slackHandle } = userData;
+            const displayName = slackHandle || name || 'Player';
+            
+            console.log(`[NeighborhoodEnvironment] User data retrieved, connecting with:`, {
+              displayName, 
+              hasProfilePic: !!profilePicture,
+              profilePicUrl: profilePicture?.substring(0, 30) + '...'
+            });
+            
+            // Connect with player info
+            socketManager.connect({
+              name: displayName,
+              profilePicture
+            });
+            
+            // Set up multiple update attempts to ensure profile data is propagated
+            const updateSlackData = () => {
+              console.log("[NeighborhoodEnvironment] Sending explicit player info update");
+              import('../utils/slack').then(({ updatePlayerInfoFromSlack }) => {
+                updatePlayerInfoFromSlack(socketManager, token)
+                  .then(success => {
+                    console.log("[NeighborhoodEnvironment] Player info update from Slack:", success ? "success" : "failed");
+                  })
+                  .catch(err => {
+                    console.error("[NeighborhoodEnvironment] Error updating player info from Slack:", err);
+                  });
+              });
+            };
+            
+            // Schedule multiple updates to ensure data gets propagated
+            const updateTimers = [];
+            updateTimers.push(setTimeout(updateSlackData, 2000));
+            updateTimers.push(setTimeout(updateSlackData, 5000));
+            updateTimers.push(setTimeout(updateSlackData, 10000));
+            
+            // Store all timers for cleanup
+            cleanupTimer = updateTimers;
+          } catch (error) {
+            console.error('[NeighborhoodEnvironment] Failed to get user data before connecting:', error);
+            // Connect without player info
+            socketManager.connect();
+          }
+        })();
+      } else {
+        console.log("[NeighborhoodEnvironment] No auth token found, connecting with default player info");
+        // No token, connect without player info
+        socketManager.connect();
+      }
 
       return () => {
+        console.log("[NeighborhoodEnvironment] Cleaning up socket connection");
         // Clean up callbacks
+        if (cleanupTimer) {
+          if (Array.isArray(cleanupTimer)) {
+            cleanupTimer.forEach(timer => clearTimeout(timer));
+          } else {
+            clearTimeout(cleanupTimer);
+          }
+        }
         socketManager.onPlayersUpdate = null;
         socketManager.onConnectionStatusChange = null;
         socketManager.onSimonSaysStarted = null;
