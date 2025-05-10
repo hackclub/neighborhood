@@ -26,6 +26,8 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
   const [photoboothLink, setPhotoboothLink] = useState("");
   const [demoUploading, setDemoUploading] = useState(false);
   const [photoboothUploading, setPhotoboothUploading] = useState(false);
+  const [demoUploadProgress, setDemoUploadProgress] = useState(0);
+  const [photoboothUploadProgress, setPhotoboothUploadProgress] = useState(0);
   const [posting, setPosting] = useState(false);
   const [postSuccess, setPostSuccess] = useState(false);
   const [postError, setPostError] = useState("");
@@ -160,6 +162,7 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
             playClimbingNote(milestones[idx]);
             lastMilestone = idx;
           }
+          setDemoUploadProgress(percent); // Update progress state
         });
         setDemoLink(responseData.url);
         playSuccessSound(); // Play sound on upload success
@@ -167,6 +170,7 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
         setDemoLink("");
       } finally {
         setDemoUploading(false);
+        setDemoUploadProgress(0); // Reset progress state
       }
     }
   }, [piano, audioCtx]);
@@ -195,6 +199,7 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
             playClimbingNote(milestones[idx]);
             lastMilestone = idx;
           }
+          setPhotoboothUploadProgress(percent); // Update progress state
         });
         setPhotoboothLink(responseData.url);
         playSuccessSound(); // Play sound on upload success
@@ -202,6 +207,7 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
         setPhotoboothLink("");
       } finally {
         setPhotoboothUploading(false);
+        setPhotoboothUploadProgress(0); // Reset progress state
       }
     }
   }, [piano, audioCtx]);
@@ -353,8 +359,18 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
                 </>
               )}
               {photoboothUploading && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 20, zIndex: 2 }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 20, zIndex: 2 }}>
                   <span style={{ color: '#786A50', fontWeight: 600, fontSize: 18 }}>Uploading…</span>
+                  <div style={{ marginTop: 12, width: '60%', height: 8, backgroundColor: 'rgba(120, 106, 80, 0.2)', borderRadius: 4 }}>
+                    <div style={{ 
+                      width: `${Math.round(photoboothUploadProgress * 100)}%`, 
+                      height: '100%', 
+                      backgroundColor: '#007A72', 
+                      borderRadius: 4,
+                      transition: 'width 0.3s ease-in-out'
+                    }}></div>
+                  </div>
+                  <span style={{ color: '#786A50', fontSize: 14, marginTop: 8 }}>{Math.round(photoboothUploadProgress * 100)}%</span>
                 </div>
               )}
               <input
@@ -388,8 +404,18 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
                   </>
                 )}
                 {demoUploading && (
-                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 20, zIndex: 2 }}>
+                  <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(255,255,255,0.7)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 20, zIndex: 2 }}>
                     <span style={{ color: '#786A50', fontWeight: 600, fontSize: 18 }}>Uploading…</span>
+                    <div style={{ marginTop: 12, width: '60%', height: 8, backgroundColor: 'rgba(120, 106, 80, 0.2)', borderRadius: 4 }}>
+                      <div style={{ 
+                        width: `${Math.round(demoUploadProgress * 100)}%`, 
+                        height: '100%', 
+                        backgroundColor: '#007A72', 
+                        borderRadius: 4,
+                        transition: 'width 0.3s ease-in-out'
+                      }}></div>
+                    </div>
+                    <span style={{ color: '#786A50', fontSize: 14, marginTop: 8 }}>{Math.round(demoUploadProgress * 100)}%</span>
                   </div>
                 )}
                 <input
@@ -519,4 +545,4 @@ const PostComponent = ({ isExiting, onClose, userData }) => {
   );
 };
 
-export default PostComponent; 
+export default PostComponent;
