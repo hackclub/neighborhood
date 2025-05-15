@@ -1,0 +1,52 @@
+@import "tailwindcss" source(none);
+@source "../components/docs/";
+@source "../pages/info";
+
+@theme {
+	--color-sky-blue: #47d1f6;
+	--color-yellow: #f5e018;
+	--color-dark-blue: #007bbd;
+	--color-green: #4bc679;
+	--color-brown: #e49773;
+	--color-sand: #e6d7d6;
+	--color-dark-brown: #3b2715;
+	--text-color: #505e78;
+}
+
+/* h1 {
+	font-family: "ohno-softie-variable", sans-serif;
+	font-variation-settings: "wght" 600;
+}
+
+h2 {
+	font-family: "Baloo Da 2", sans-serif;
+	font-weight: 500;
+	font-optical-sizing: auto;
+}
+
+p {
+	font-family: "Poppins", sans-serif;
+	font-optical-sizing: auto;
+	font-style: normal;
+}
+
+* {
+	font-family: "Poppins", sans-serif;
+	font-optical-sizing: auto;
+} */
+
+.link {
+	@apply underline hover:text-dark-blue transition;
+}
+s .text-outline-dark-blue {
+	/* text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000; */
+	text-shadow: 2px 2px 2px rgba(0, 123, 189, 1);
+}
+
+.tooltip {
+	@apply invisible absolute;
+}
+
+.has-tooltip:hover .tooltip {
+	@apply visible z-50;
+}

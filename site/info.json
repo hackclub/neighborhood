@@ -1,0 +1,17 @@
+[
+	{
+		"name": "FAQ",
+		"slug": "faq",
+		"emoji": "❓"
+	},
+	{
+		"name": "Travel Stipends",
+		"slug": "travel-stipends",
+		"emoji": "✈️"
+	},
+	{
+		"name": "For Parents",
+		"slug": "for-parents",
+		"emoji": "👪"
+	}
+]
