@@ -259,7 +259,7 @@ const PostsViewComponent = ({ isExiting, onClose, posts, userData }) => {
         position: "relative"
       }}>
         {/* Current post */}
-        <div style={{display: "flex", width: "100%", flexDirection: "row"}}>
+        <div style={{display: "flex", width: "100%", flexDirection: "row", justifyContent: "center", alignItems: "center"}}>
         <div 
           style={{
             width: "75%",
