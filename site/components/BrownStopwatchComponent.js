@@ -269,7 +269,7 @@ const BrownStopwatchComponent = ({ isExiting, onClose, userData }) => {
         formData.append("file", commitVideo);
 
         const uploadResponse = await fetch(
-          `https://express.spectralo.hackclub.app/video/upload`,
+          `https://express.neighborhood.hackclub.com/video/upload`,
           {
             method: "POST",
             body: formData,

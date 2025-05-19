@@ -68,7 +68,7 @@ const AppsComponent = ({ isExiting, onClose, userData, setUserData, slackUsers, 
         formData.append('token', localStorage.getItem('neighborhoodToken') || getToken());
         
         // Upload to S3 via neighborhood-express
-        const response = await fetch('https://vgso8kg840ss8cok4s4cwwgk.a.selfhosted.hackclub.com/upload-icon', {
+        const response = await fetch('https://express.neighborhood.hackclub.com/upload-icon', {
           method: 'POST',
           body: formData,
         });
@@ -108,7 +108,7 @@ const AppsComponent = ({ isExiting, onClose, userData, setUserData, slackUsers, 
         formData.append('token', localStorage.getItem('neighborhoodToken') || getToken());
         
         // Upload to S3 via neighborhood-express
-        const response = await fetch('https://vgso8kg840ss8cok4s4cwwgk.a.selfhosted.hackclub.com/upload-images', {
+        const response = await fetch('https://express.neighborhood.hackclub.com/upload-images', {
           method: 'POST',
           body: formData,
         });

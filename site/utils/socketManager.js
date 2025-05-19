@@ -61,8 +61,8 @@ class SocketManager {
     // For development vs production
     const isProduction = typeof window !== 'undefined' && window.location.hostname !== 'localhost';
     const socketUrl = isProduction 
-      ? 'https://vgso8kg840ss8cok4s4cwwgk.a.selfhosted.hackclub.com'
-      : 'https://vgso8kg840ss8cok4s4cwwgk.a.selfhosted.hackclub.com';
+      ? 'https://express.neighborhood.hackclub.com'
+      : 'https://express.neighborhood.hackclub.com';
     
     this.log(`Using socket URL: ${socketUrl} (attempt ${this._connectionAttempts})`);
     

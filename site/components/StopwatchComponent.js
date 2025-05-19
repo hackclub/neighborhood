@@ -490,7 +490,7 @@ const StopwatchComponent = ({ onClose, onAddProject, isExiting, userData }) => {
         formData.append("file", commitVideo); // 'file' matches what your server expects
 
         const uploadResponse = await fetch(
-          `https://express.spectralo.hackclub.app/video/upload`,
+          `https://express.neighborhood.hackclub.com/video/upload`,
           {
             method: "POST",
             // Don't set Content-Type - fetch will set it automatically with boundary for FormData
