@@ -350,7 +350,6 @@ const PostsViewComponent = ({ isExiting, onClose, posts, userData, isLoadingPost
               controls
               playsInline
               autoPlay
-              loop
               style={{
                 width: "300px",
                 borderRadius: "12px",
@@ -439,7 +438,6 @@ const PostsViewComponent = ({ isExiting, onClose, posts, userData, isLoadingPost
               controls
               playsInline
               autoPlay
-              loop
               style={{
                 width: "100%",
                 borderRadius: "12px",
