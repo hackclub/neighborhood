@@ -472,6 +472,7 @@ export default function Home() {
                   </div>}
       </div>
       {showLetter && (
+        <>
         <div style={{
           position: 'fixed',
           top: 0,
@@ -484,7 +485,14 @@ export default function Home() {
           alignItems: 'center',
           zIndex: 1000
         }} onClick={() => setShowLetter(false)}>
-          <div style={{
+        
+        </div>
+        <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            zIndex: 1001,
             width: '100%',
             maxWidth: '700px',
             backgroundColor: "#fff",
@@ -494,7 +502,6 @@ export default function Home() {
             gap: 16,
             display: "flex",
             flexDirection: "column",
-            position: 'relative', 
             padding: 32,
             fontFamily: "'Caveat', cursive",
             fontSize: "20px",
@@ -528,8 +535,7 @@ export default function Home() {
               </p> */}
               {/* <p style={{transform: "rotate(-0.4deg)", fontSize: "16px"}}><i>pssst... checkout <a style={{color: "#007C74", textDecoration: "underline"}} href="https://youtube.com/playlist?list=PLbNbddgD-XxH0TDS6qFynB6-YnWZU5Fhc&si=vMATC4c3VDzUuqwR">this documentary from Juice</a>, our popup game cafe in Shanghai, China</i></p> */}
           </div>
-        </div>
-      )}
+          </>)}
       {showVideo && (
         <div style={{
           position: 'fixed',
