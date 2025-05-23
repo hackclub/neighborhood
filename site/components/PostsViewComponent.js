@@ -349,19 +349,14 @@ const PostsViewComponent = ({ isExiting, onClose, posts, userData, isLoadingPost
             <video 
               controls
               playsInline
+              autoPlay
+              loop
               style={{
                 width: "300px",
                 borderRadius: "12px",
                 aspectRatio: "16/9",
                 objectFit: "fit",
                 backgroundColor: "#000"
-              }}
-              onMouseEnter={(e) => {
-                e.target.play();
-              }}
-              onMouseLeave={(e) => {
-                e.target.pause();
-                e.target.currentTime = 0;
               }}
               src={currentPost.photoboothVideo}
             />
@@ -443,19 +438,14 @@ const PostsViewComponent = ({ isExiting, onClose, posts, userData, isLoadingPost
             <video 
               controls
               playsInline
+              autoPlay
+              loop
               style={{
                 width: "100%",
                 borderRadius: "12px",
                 aspectRatio: "16/9",
                 objectFit: "fit",
                 backgroundColor: "#000"
-              }}
-              onMouseEnter={(e) => {
-                e.target.play();
-              }}
-              onMouseLeave={(e) => {
-                e.target.pause();
-                e.target.currentTime = 0;
               }}
               src={currentPost.demoVideo}
             />
