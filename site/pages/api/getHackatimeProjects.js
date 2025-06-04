@@ -12,56 +12,69 @@ export default async function handler(req, res) {
   const { slackId, userId } = req.query;
 
   if (!slackId || !userId) {
-    return res.status(400).json({ error: 'Slack ID and user ID are required' });
+    return res.status(400).json({ error: `Missing required parameters. Received: slackId=${slackId}, userId=${userId}` });
   }
 
   try {
-    // Fetch Hackatime data directly from their API
+    const hackatimeUrl = `https://hackatime.hackclub.com/api/v1/users/${slackId}/stats?features=projects&start_date=2025-04-30`;
     console.log(`[DEBUG] Fetching Hackatime data for slackId: ${slackId}`);
-    const hackatimeResponse = await fetch(
-      `https://hackatime.hackclub.com/api/v1/users/${slackId}/stats?features=projects&start_date=2025-04-30`,
-      {
-        headers: {
-          Accept: "application/json",
-        },
-      }
-    );
-
-    if (!hackatimeResponse.ok) {
-      console.error(`[ERROR] Hackatime API responded with status: ${hackatimeResponse.status}`);
-      throw new Error(`Hackatime API responded with status: ${hackatimeResponse.status}`);
+    let hackatimeResponse;
+    try {
+      hackatimeResponse = await fetch(hackatimeUrl, {
+        headers: { Accept: "application/json" },
+      });
+    } catch (err) {
+      console.error(`[ERROR] Network error fetching Hackatime API:`, err);
+      return res.status(502).json({ error: `Network error fetching Hackatime API: ${err.message}`, stack: err.stack });
     }
 
-    const hackatimeData = await hackatimeResponse.json();
+    if (!hackatimeResponse.ok) {
+      const text = await hackatimeResponse.text();
+      console.error(`[ERROR] Hackatime API responded with status: ${hackatimeResponse.status}, body: ${text}`);
+      return res.status(502).json({ error: `Hackatime API responded with status: ${hackatimeResponse.status}`, body: text, url: hackatimeUrl });
+    }
+
+    let hackatimeData;
+    try {
+      hackatimeData = await hackatimeResponse.json();
+    } catch (err) {
+      console.error(`[ERROR] Failed to parse Hackatime API response as JSON:`, err);
+      return res.status(500).json({ error: `Failed to parse Hackatime API response as JSON`, stack: err.stack });
+    }
+    if (!hackatimeData?.data?.projects) {
+      console.error(`[ERROR] No projects found in Hackatime data. Full response:`, hackatimeData);
+      return res.status(404).json({ error: `No projects found in Hackatime data`, hackatimeData });
+    }
     console.log("[DEBUG] Hackatime data projects:", JSON.stringify(hackatimeData.data.projects, null, 2));
     
-    // Get all project names
     const projectNames = hackatimeData.data.projects.map(p => p.name);
     console.log("\n=== [DEBUG] Project Details ===");
     console.log("Current User ID:", userId);
     console.log("Project names from Hackatime:", projectNames);
 
-    // Safety check for empty projects array
     if (projectNames.length === 0) {
       console.log("[DEBUG] No projects found in Hackatime data, returning empty array");
       return res.status(200).json({ projects: [] });
     }
 
-    // Use SEARCH() function in Airtable formula to avoid issues with special characters
     const filterFormula = `OR(${projectNames.map(name => {
-      // Double the quotes to escape them in Airtable formula string
       const escapedName = name.replace(/"/g, '""');
       return `{name}="${escapedName}"`;
     }).join(",")})`;
     console.log("[DEBUG] Airtable filter formula:", filterFormula);
     
-    // Check which projects are already attributed
-    const existingProjects = await base("hackatimeProjects")
-      .select({
-        filterByFormula: filterFormula,
-        fields: ['name', 'neighbor', 'Apps', 'email']
-      })
-      .all();
+    let existingProjects;
+    try {
+      existingProjects = await base("hackatimeProjects")
+        .select({
+          filterByFormula: filterFormula,
+          fields: ['name', 'neighbor', 'Apps', 'email']
+        })
+        .all();
+    } catch (err) {
+      console.error(`[ERROR] Airtable query failed:`, err);
+      return res.status(500).json({ error: `Airtable query failed`, stack: err.stack, filterFormula, userId });
+    }
 
     console.log("\n=== [DEBUG] Airtable Project Details ===");
     console.log("Current User ID:", userId);
@@ -80,16 +93,13 @@ export default async function handler(req, res) {
       });
     });
 
-    // Create a map to store project attribution and user association
     const projectStatusMap = new Map();
     
-    // First pass: gather all project statuses
     console.log("\n=== [DEBUG] Processing Project Statuses ===");
     console.log("Current User ID:", userId);
     existingProjects.forEach(project => {
       const neighborIds = project.fields.neighbor || [];
       const isUserProject = neighborIds.includes(userId);
-      const hasApps = project.fields.Apps && project.fields.Apps.length > 0;
       
       console.log(`\nProject "${project.fields.name}":`, {
         projectId: project.id,
@@ -107,24 +117,20 @@ export default async function handler(req, res) {
           exactComparison: neighborIds.map(id => `${id} === ${userId} : ${id === userId}`)
         },
         apps: {
-          hasApps: hasApps,
           appIds: project.fields.Apps || []
         }
       });
 
       projectStatusMap.set(project.fields.name, {
         isUserProject,
-        isAttributed: hasApps && !isUserProject,
-        attributedToAppId: hasApps ? project.fields.Apps[0] : null
+        attributedToAppId: project.fields.Apps ? project.fields.Apps[0] : null
       });
     });
 
-    // Add attribution status to each project
     console.log("\n=== [DEBUG] Final Project Statuses ===");
     const projectsWithStatus = hackatimeData.data.projects.map(project => {
       const status = projectStatusMap.get(project.name) || {
         isUserProject: false,
-        isAttributed: false,
         attributedToAppId: null
       };
 
@@ -136,7 +142,6 @@ export default async function handler(req, res) {
         fromAirtable: projectStatusMap.get(project.name),
         finalStatus: {
           isUserProject: status.isUserProject,
-          isAttributed: status.isAttributed,
           attributedToAppId: status.attributedToAppId
         }
       });
@@ -144,7 +149,6 @@ export default async function handler(req, res) {
       return {
         ...project,
         isUserProject: status.isUserProject,
-        isAttributed: status.isAttributed,
         attributedToAppId: status.attributedToAppId,
         totalSeconds: project.total_seconds
       };
@@ -154,19 +158,22 @@ export default async function handler(req, res) {
     console.log("Projects being returned:", projectsWithStatus.map(p => ({
       name: p.name,
       isUserProject: p.isUserProject,
-      isAttributed: p.isAttributed,
       attributedToAppId: p.attributedToAppId,
       totalSeconds: p.total_seconds
     })));
 
-    // Return the projects data with attribution status
     return res.status(200).json({
       projects: projectsWithStatus || []
     });
 
   } catch (error) {
-    console.error('[ERROR] Error fetching Hackatime projects:', error);
-    console.error('[ERROR] Error stack:', error.stack);
-    return res.status(500).json({ error: 'Failed to fetch Hackatime projects' });
+    console.error('[FATAL ERROR] Unexpected error in getHackatimeProjects:', error);
+    return res.status(500).json({
+      error: 'Unexpected error in getHackatimeProjects',
+      message: error.message,
+      stack: error.stack,
+      slackId,
+      userId
+    });
   }
-} 
+}
