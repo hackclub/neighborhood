@@ -5,6 +5,7 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID);
 
+const rateLimits = new Map();
 /**
  * Sanitizes an OTP string by removing non-digit characters
  * @param {string} otpString - The OTP string to sanitize
@@ -15,13 +16,32 @@ function sanitizeOTP(otpString) {
   return otpString.toString().replace(/[^\d]/g, "");
 }
 
+function istoofast(email, ip) {
+  const now = Date.now();
+  const key = `${email}_${ip}`;
+  const limit = rateLimits.get(key) || { count: 0, reset: now + 300000 };
+  
+  if (now > limit.reset) {
+    limit.count = 0;
+    limit.reset = now + 300000;
+  }
+  
+  if (limit.count >= 5) {
+    return false;
+  }
+  
+  limit.count++;
+  rateLimits.set(key, limit);
+  return true;
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
   const { email, otp } = req.body;
-
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
   // Sanitize otp and email with regex
 
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -33,6 +53,11 @@ export default async function handler(req, res) {
   if (!otp || !otpRegex.test(otp)) {
     console.log("Invalid OTP format:", otp);
     return res.status(400).json({ message: "Invalid OTP format" });
+  }
+
+  if (!istoofast(email, ip)) {
+    console.log("Rate limit exceeded for:", email, ip);
+    return res.status(429).json({ message: "Too many attempts" });
   }
 
   if (!email || !otp) {
