@@ -47,33 +47,34 @@ export default async function handler(req, res) {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!email || !emailRegex.test(email)) {
     console.log("Invalid email format:", email);
-    return res.status(400).json({ message: "Denied" });
+    return res.status(400).json({ message: "Invalid email format" });
   }
-  const otpRegex = /^\d{4}$/;
+  const otpRegex = /^\d{4}$/; // Assuming OTP is a 6-digit number
   if (!otp || !otpRegex.test(otp)) {
     console.log("Invalid OTP format:", otp);
-    return res.status(400).json({ message: "Denied" });
+    return res.status(400).json({ message: "Invalid OTP format" });
   }
 
   if (!istoofast(email, ip)) {
     console.log("Rate limit exceeded for:", email, ip);
-    return res.status(429).json({ message: "Denied" });
+    return res.status(429).json({ message: "Too many attempts" });
   }
 
   if (!email || !otp) {
     console.log("email and otp are required");
     console.log("email", email);
     console.log("otp", otp);
-    return res.status(400).json({ message: "Denied" });
+    return res.status(400).json({ message: "Email and OTP are required" });
   }
 
   try {
     // Sanitize the input OTP
     const sanitizedOTP = sanitizeOTP(otp);
 
+    // Get the most recent OTP record for this email that hasn't been used
     const otpRecords = await base("OTP")
       .select({
-        filterByFormula: `AND({Email} = '${email}', {isUsed} = 0, {failedAttempts} < 3)`,
+        filterByFormula: `AND({Email} = '${email}', {isUsed} = 0)`,
         sort: [{ field: "createdAt", direction: "desc" }],
         maxRecords: 1,
       })
@@ -81,7 +82,7 @@ export default async function handler(req, res) {
 
     if (otpRecords.length === 0) {
       console.log("No valid OTP found for email:", email);
-      return res.status(400).json({ message: "Denied" });
+      return res.status(400).json({ message: "No valid OTP found" });
     }
 
     const latestOTP = otpRecords[0];
@@ -94,36 +95,15 @@ export default async function handler(req, res) {
       console.log("Expected OTP:", sanitizedStoredOTP);
       console.log("Received OTP:", sanitizedOTP);
 
-      // Increment failed attempts
-      const currentFailedAttempts = (latestOTP.fields.failedAttempts || 0) + 1;
-      
-      await base("OTP").update([
-        {
-          id: latestOTP.id,
-          fields: {
-            failedAttempts: currentFailedAttempts,
-          },
-        },
-      ]);
-
       // Debug info if needed
       if (process.env.NODE_ENV !== "production") {
         console.log("Original stored OTP:", latestOTP.fields.OTP);
         console.log("Original received OTP:", otp);
         console.log("Stored OTP length:", sanitizedStoredOTP.length);
         console.log("Received OTP length:", sanitizedOTP.length);
-        console.log("Failed attempts:", currentFailedAttempts);
       }
 
-      if (currentFailedAttempts >= 3) {
-        return res.status(400).json({ 
-          message: "Denied" 
-        });
-      }
-
-      return res.status(400).json({ 
-        message: "Denied" 
-      });
+      return res.status(400).json({ message: "Invalid OTP" });
     }
 
     // Mark OTP as used
@@ -146,7 +126,7 @@ export default async function handler(req, res) {
 
     if (userRecords.length === 0) {
       console.log("User not found for email:", email);
-      return res.status(400).json({ message: "Denied" });
+      return res.status(404).json({ message: "User not found" });
     }
 
     return res.status(200).json({

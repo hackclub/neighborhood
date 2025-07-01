@@ -90,7 +90,6 @@ export default async function handler(req, res) {
           Email: normalizedEmail,
           OTP: otp,
           isUsed: false,
-          failedAttempts: 0,
         },
       },
     ]);
