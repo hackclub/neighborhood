@@ -39,9 +39,6 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    const user = userRecords[0];
-    const userId = user.id;
-
     console.log("Looking for submission with appId:", appId);
 
     // Get all submissions and filter manually since Airtable returns Apps as an array
@@ -57,7 +54,6 @@ export default async function handler(req, res) {
     // Find the submission where the Apps array contains our appId
     const submission = allSubmissions.find((sub) => {
       const apps = sub.fields.app;
-      const owners = sub.fields.neighbor || [];
       console.log(
         "Checking submission app:",
         apps,
@@ -65,12 +61,8 @@ export default async function handler(req, res) {
         typeof apps,
         "Is Array:",
         Array.isArray(apps),
-        "Owners:",
-        owners
       );
-      // auth check, why the fuck was this not here
-      return Array.isArray(apps) && apps.includes(appId) && 
-             Array.isArray(owners) && owners.includes(userId);
+      return Array.isArray(apps) && apps.includes(appId);
     });
 
     if (submission) {
