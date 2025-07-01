@@ -1,22 +1,24 @@
 import Airtable from "airtable";
 import crypto from "crypto";
 
-// Initialize Airtable
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID);
 
-// Generate a random token
 const generateToken = () => {
-  return crypto.randomBytes(40).toString("base64url");
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = crypto.randomInt(0, charset.length);
+    token += charset[randomIndex];
+  }
+  return token;
 };
 
-// Generate a 4 digit OTP
 const generateOTP = () => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
 
-// Send OTP email via Loops
 const sendOTPEmail = async (email, otp) => {
   const url = "https://app.loops.so/api/v1/transactional";
   const payload = {
@@ -53,12 +55,10 @@ export default async function handler(req, res) {
 
   const { email } = req.body;
 
-  // Sanitize email
-
   if (typeof email !== "string" || email.length > 254) {
     return res.status(400).json({ message: "Invalid email format" });
   }
-  // regex
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ message: "Invalid email format" });
@@ -68,11 +68,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Email is required" });
   }
 
-  // Normalize email by stripping whitespace and converting to lowercase
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    // Check if user already exists
     const records = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
         filterByFormula: `{email} = '${normalizedEmail}'`,
@@ -80,10 +78,8 @@ export default async function handler(req, res) {
       })
       .firstPage();
 
-    // Generate OTP for this attempt
     const otp = generateOTP();
 
-    // Create OTP record regardless of whether user exists
     await base("OTP").create([
       {
         fields: {
@@ -94,10 +90,8 @@ export default async function handler(req, res) {
       },
     ]);
 
-    // Send OTP email
     await sendOTPEmail(normalizedEmail, otp);
 
-    // If user exists, return success without creating new record
     if (records.length > 0) {
       return res.status(200).json({
         message: "OTP sent successfully",
@@ -105,7 +99,6 @@ export default async function handler(req, res) {
       });
     }
 
-    // For new users, generate token and create record
     const token = generateToken();
     const newRecord = await base(process.env.AIRTABLE_TABLE_ID).create([
       {
