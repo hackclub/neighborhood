@@ -146,7 +146,7 @@ export default async function handler(req, res) {
       "ZIP / Postal Code": zipCode,
       Birthday: birthday,
       app: [appId], // Link to the app record
-      neighbor: [userId],
+      neighbors: [userId],
     };
 
     // Create a separate fields object for ShipLog that includes changesMade
