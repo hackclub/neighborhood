@@ -16,9 +16,14 @@ const generateToken = () => {
 };
 
 const generateOTP = () => {
-  return Math.floor(1000 + Math.random() * 9000).toString();
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let otp = '';
+  for (let i = 0; i < 6; i++) {
+    const randomIndex = crypto.randomInt(0, charset.length);
+    otp += charset[randomIndex];
+  }
+  return otp;
 };
-
 const sendOTPEmail = async (email, otp) => {
   const url = "https://app.loops.so/api/v1/transactional";
   const payload = {
