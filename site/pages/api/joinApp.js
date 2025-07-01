@@ -1,4 +1,4 @@
-import Airtable from "airtable";Add commentMore actions
+import Airtable from "airtable";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -94,7 +94,7 @@ export default async function handler(req, res) {
       icon: completeApp.fields.Icon || null,
       appLink: completeApp.fields["App Link"] || "",
       githubLink: completeApp.fields["Github Link"] || "",
-      description: completeApp.fields.Description || "",Add commentMore actions
+      description: completeApp.fields.Description || "",
       createdAt: completeApp.fields.createdAt || null,
       images: completeApp.fields.Images
         ? completeApp.fields.Images.split(",")
