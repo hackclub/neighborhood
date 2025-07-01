@@ -75,6 +75,8 @@ export default async function handler(req, res) {
       return res.status(404).json({ message: "User not found" });
     }
 
+    const userId = userRecords[0].id;
+
     // Check if any screenshot is too large
     let totalSize = 0;
     for (const screenshot of screenshots) {
@@ -144,6 +146,7 @@ export default async function handler(req, res) {
       "ZIP / Postal Code": zipCode,
       Birthday: birthday,
       app: [appId], // Link to the app record
+      neighbors: [userId],
     };
 
     // Create a separate fields object for ShipLog that includes changesMade
