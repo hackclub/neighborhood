@@ -29,6 +29,13 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'No token provided' });
   }
 
+  // Check token with regex
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+
+  if (!tokenRegex.test(token)) {
+    return res.status(400).json({ message: "Invalid token format" });
+  }
+
   try {
     // Find the user with this token
     console.log('Looking up user with token:', token.substring(0, 5) + '...');
