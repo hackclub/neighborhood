@@ -9,7 +9,7 @@ export default function Home() {
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
       </Head>
       <div>
-        <p>Unfortunately, we have come to the difficult decision that we must end Neighborhood prematurely. I know for everyone this is incredibly disappointing. More information has been shared with participants, students, and members of the Hack Club Slack.</p>
+        <p>Neighborhood has ended but join the slack for more adventures like this one! <a href="http://hackclub.com/slack">Join the slack</a></p>
       </div>
     </>
   );
