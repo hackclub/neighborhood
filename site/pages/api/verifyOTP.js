@@ -1,18 +1,33 @@
 import Airtable from "airtable";
 
-// Initialize Airtable
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID);
 
-/**
- * Sanitizes an OTP string by removing non-digit characters
- * @param {string} otpString - The OTP string to sanitize
- * @returns {string} - The sanitized OTP containing only digits
- */
+const rateLimits = new Map();
+
 function sanitizeOTP(otpString) {
   if (!otpString) return "";
-  return otpString.toString().replace(/[^\d]/g, "");
+  return otpString.toString().replace(/[^a-zA-Z0-9]/g, "");
+}
+
+function istoofast(email, ip) {
+  const now = Date.now();
+  const key = `${email}_${ip}`;
+  const limit = rateLimits.get(key) || { count: 0, reset: now + 300000 };
+
+  if (now > limit.reset) {
+    limit.count = 0;
+    limit.reset = now + 300000;
+  }
+
+  if (limit.count >= 5) {
+    return false;
+  }
+
+  limit.count++;
+  rateLimits.set(key, limit);
+  return true;
 }
 
 export default async function handler(req, res) {
@@ -21,6 +36,24 @@ export default async function handler(req, res) {
   }
 
   const { email, otp } = req.body;
+  const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    console.log("Invalid email format:", email);
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
+  const otpRegex = /^[a-zA-Z0-9]{6}$/;
+  if (!otp || !otpRegex.test(otp)) {
+    console.log("Invalid OTP format:", otp);
+    return res.status(400).json({ message: "Invalid OTP format" });
+  }
+
+  if (!istoofast(email, ip)) {
+    console.log("Rate limit exceeded for:", email, ip);
+    return res.status(429).json({ message: "Too many attempts" });
+  }
 
   if (!email || !otp) {
     console.log("email and otp are required");
@@ -30,10 +63,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Sanitize the input OTP
     const sanitizedOTP = sanitizeOTP(otp);
 
-    // Get the most recent OTP record for this email that hasn't been used
     const otpRecords = await base("OTP")
       .select({
         filterByFormula: `AND({Email} = '${email}', {isUsed} = 0)`,
@@ -48,16 +79,13 @@ export default async function handler(req, res) {
     }
 
     const latestOTP = otpRecords[0];
-    // Sanitize the stored OTP as well to ensure consistent comparison
     const sanitizedStoredOTP = sanitizeOTP(latestOTP.fields.OTP);
 
-    // Check if OTP matches
     if (sanitizedStoredOTP !== sanitizedOTP) {
       console.log("OTP validation failed");
       console.log("Expected OTP:", sanitizedStoredOTP);
       console.log("Received OTP:", sanitizedOTP);
 
-      // Debug info if needed
       if (process.env.NODE_ENV !== "production") {
         console.log("Original stored OTP:", latestOTP.fields.OTP);
         console.log("Original received OTP:", otp);
@@ -68,7 +96,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ message: "Invalid OTP" });
     }
 
-    // Mark OTP as used
     await base("OTP").update([
       {
         id: latestOTP.id,
@@ -78,7 +105,6 @@ export default async function handler(req, res) {
       },
     ]);
 
-    // Get user's token from the main table
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
         filterByFormula: `{email} = '${email}'`,

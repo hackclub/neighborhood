@@ -11,6 +11,12 @@ export default async function handler(req, res) {
 
   const { token } = req.query;
 
+  // Check token with regex
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  if (!token || !tokenRegex.test(token)) {
+    return res.status(400).json({ message: "Invalid or missing token" });
+  }
+
   if (!token) {
     return res.status(400).json({ message: "Missing token" });
   }
@@ -43,18 +49,25 @@ export default async function handler(req, res) {
           "neighbor",
           "Type",
           "hackatimeProject",
-          "Apps"
+          "Apps",
         ],
         sort: [{ field: "commitTime", direction: "desc" }],
       })
       .all();
 
-    console.log("Raw commits data from Airtable:", JSON.stringify(commits.map(c => ({
-      id: c.id,
-      commitTime: c.fields.commitTime,
-      message: c.fields.message,
-      Apps: c.fields.Apps
-    })), null, 2));
+    console.log(
+      "Raw commits data from Airtable:",
+      JSON.stringify(
+        commits.map((c) => ({
+          id: c.id,
+          commitTime: c.fields.commitTime,
+          message: c.fields.message,
+          Apps: c.fields.Apps,
+        })),
+        null,
+        2,
+      ),
+    );
 
     // Fetch session details and project names for each commit
     const commitsWithDetails = await Promise.all(
@@ -63,7 +76,7 @@ export default async function handler(req, res) {
           id: commit.id,
           message: commit.fields.message,
           commitTime: commit.fields.commitTime,
-          rawApps: commit.fields.Apps
+          rawApps: commit.fields.Apps,
         });
 
         const sessionIds = commit.fields.sessions || [];
@@ -127,7 +140,7 @@ export default async function handler(req, res) {
             })
             .all();
 
-          appNames = appRecords.map(record => record.fields.Name);
+          appNames = appRecords.map((record) => record.fields.Name);
           console.log("Found app names:", appNames, "for ids:", appIds);
         } else {
           console.log("No app IDs found for commit");

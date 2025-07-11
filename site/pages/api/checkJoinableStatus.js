@@ -11,6 +11,12 @@ export default async function handler(req, res) {
 
   const { appId } = req.query;
 
+  // Validate appId with regex to ensure it matches Airtable's record ID format
+  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
+  if (!appId || !recordIdRegex.test(appId)) {
+    return res.status(400).json({ message: "Invalid or missing app ID" });
+  }
+
   if (!appId) {
     return res.status(400).json({ message: "App ID is required" });
   }
@@ -38,6 +44,11 @@ export default async function handler(req, res) {
     });
   } catch (error) {
     console.error("Error retrieving app joinable status:", error);
-    return res.status(500).json({ message: "Error retrieving app joinable status", error: error.message });
+    return res
+      .status(500)
+      .json({
+        message: "Error retrieving app joinable status",
+        error: error.message,
+      });
   }
 }

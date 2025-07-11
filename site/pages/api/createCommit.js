@@ -9,11 +9,33 @@ export default async function handler(req, res) {
     return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const { token, commitMessage, videoUrl, projectName, appId, session } = req.body;
+  const { token, commitMessage, videoUrl, projectName, appId, session } =
+    req.body;
 
-  if (!token || !commitMessage || !videoUrl || !projectName || !appId || !session) {
-    console.log("Missing required parameters:", { token, commitMessage, videoUrl, projectName, appId, session });
+  if (
+    !token ||
+    !commitMessage ||
+    !videoUrl ||
+    !projectName ||
+    !appId ||
+    !session
+  ) {
+    console.log("Missing required parameters:", {
+      token,
+      commitMessage,
+      videoUrl,
+      projectName,
+      appId,
+      session,
+    });
     return res.status(400).json({ message: "Missing required parameters" });
+  }
+
+  // check token is valid with a regex
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  if (!tokenRegex.test(token)) {
+    console.log("Invalid token format:", token);
+    return res.status(400).json({ message: "Invalid token format" });
   }
 
   try {
@@ -50,7 +72,10 @@ export default async function handler(req, res) {
       Type: "P", // Set as Pending by default
     };
 
-    console.log("Creating commit with fields:", JSON.stringify(commitFields, null, 2));
+    console.log(
+      "Creating commit with fields:",
+      JSON.stringify(commitFields, null, 2),
+    );
     console.log("App ID being used:", appId);
 
     const commitRecord = await base("commits").create(
@@ -62,13 +87,22 @@ export default async function handler(req, res) {
       { typecast: true },
     );
 
-    console.log("Commit created in Airtable. Response:", JSON.stringify({
-      id: commitRecord[0].id,
-      fields: commitRecord[0].fields
-    }, null, 2));
+    console.log(
+      "Commit created in Airtable. Response:",
+      JSON.stringify(
+        {
+          id: commitRecord[0].id,
+          fields: commitRecord[0].fields,
+        },
+        null,
+        2,
+      ),
+    );
     return res.status(201).json(commitRecord);
   } catch (error) {
     console.error("Error creating commit:", error);
-    return res.status(500).json({ message: error.message || "Internal server error" });
+    return res
+      .status(500)
+      .json({ message: error.message || "Internal server error" });
   }
 }

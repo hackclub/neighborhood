@@ -11,6 +11,25 @@ export default async function handler(req, res) {
 
   const { token, projectName, appId, startTime, endTime, videoUrl } = req.body;
 
+  // Validate required fields with regex (only those used by filterByFormula)
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
+  const urlRegex =
+    /^(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)*\/?$/;
+  if (!token || !tokenRegex.test(token)) {
+    return res.status(400).json({ message: "Invalid or missing token" });
+  }
+  if (
+    !projectName ||
+    typeof projectName !== "string" ||
+    projectName.length > 100
+  ) {
+    return res.status(400).json({ message: "Invalid or missing project name" });
+  }
+  if (!appId || !recordIdRegex.test(appId)) {
+    return res.status(400).json({ message: "Invalid or missing app ID" });
+  }
+
   if (!token || !startTime || !endTime) {
     console.log("Missing required fields:", { token, startTime, endTime });
     return res.status(400).json({ message: "Missing required fields" });
@@ -48,6 +67,8 @@ export default async function handler(req, res) {
     return res.status(201).json(sessionRecords);
   } catch (error) {
     console.error("Error creating session:", error);
-    return res.status(500).json({ message: error.message || "Internal server error" });
+    return res
+      .status(500)
+      .json({ message: error.message || "Internal server error" });
   }
 }

@@ -2658,12 +2658,6 @@ const AppsComponent = ({
                     key={app.id}
                     onClick={() => handleAppClick(app)}
                     style={{
-                      opacity: appJoinableStates[app.id] ? 1 : 0.5,
-                      pointerEvents: appJoinableStates[app.id]
-                        ? "auto"
-                        : "none",
-                    }}
-                    style={{
                       display: "flex",
                       flexDirection: "column",
                       alignItems: "center",

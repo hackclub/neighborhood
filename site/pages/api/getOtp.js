@@ -4,6 +4,9 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID);
 
+// Email validation regex
+const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
 const generateOTP = () => {
   return Math.floor(1000 + Math.random() * 9000).toString();
 };
@@ -51,21 +54,36 @@ export default async function handler(req, res) {
 
   const normalizedEmail = email.trim().toLowerCase();
 
+  // Validate email format
+  if (!emailRegex.test(normalizedEmail)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
   const otp = generateOTP();
 
   // Create OTP record regardless of whether user exists
-  await base("OTP").create([
-    {
-      fields: {
-        Email: normalizedEmail,
-        OTP: otp,
-        isUsed: false,
+  try {
+    await base("OTP").create([
+      {
+        fields: {
+          Email: normalizedEmail,
+          OTP: otp,
+          isUsed: false,
+        },
       },
-    },
-  ]);
+    ]);
+  } catch (error) {
+    console.error("Error creating OTP record:", error);
+    return res.status(500).json({ message: "Failed to create OTP" });
+  }
 
   // Send OTP email
-  await sendOTPEmail(normalizedEmail, otp);
+  try {
+    await sendOTPEmail(normalizedEmail, otp);
+  } catch (error) {
+    console.error("Error sending OTP email:", error);
+    return res.status(500).json({ message: "Failed to send OTP email" });
+  }
 
   // If user exists, return success without creating new record
   return res.status(200).json({ message: "OTP sent successfully" });

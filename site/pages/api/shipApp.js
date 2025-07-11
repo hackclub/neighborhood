@@ -4,23 +4,23 @@ import Airtable from "airtable";
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: '10mb',  // Increased size limit to handle larger images
+      sizeLimit: "10mb", // Increased size limit to handle larger images
     },
   },
 };
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
-  process.env.AIRTABLE_BASE_ID
+  process.env.AIRTABLE_BASE_ID,
 );
 
 const MAX_ATTACHMENT_SIZE = 10 * 1024 * 1024; // 10MB in bytes
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ message: 'Method not allowed' });
+  if (req.method !== "POST") {
+    return res.status(405).json({ message: "Method not allowed" });
   }
 
-  const { 
+  const {
     token,
     appId,
     codeUrl,
@@ -40,17 +40,25 @@ export default async function handler(req, res) {
     stateProvince,
     country,
     zipCode,
-    birthday
+    birthday,
   } = req.body;
 
+  // Sanitize the token
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  if (!token || !tokenRegex.test(token)) {
+    return res
+      .status(400)
+      .json({ message: "Invalid token format", error: "INVALID_TOKEN" });
+  }
+
   if (!token || !appId) {
-    return res.status(401).json({ message: 'Token and appId are required' });
+    return res.status(401).json({ message: "Token and appId are required" });
   }
 
   if (!screenshots || !Array.isArray(screenshots) || screenshots.length === 0) {
-    return res.status(400).json({ 
-      message: 'At least one screenshot is required',
-      error: 'SCREENSHOT_REQUIRED'
+    return res.status(400).json({
+      message: "At least one screenshot is required",
+      error: "SCREENSHOT_REQUIRED",
     });
   }
 
@@ -59,13 +67,15 @@ export default async function handler(req, res) {
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
         filterByFormula: `{token} = '${token}'`,
-        maxRecords: 1
+        maxRecords: 1,
       })
       .firstPage();
 
     if (userRecords.length === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
+
+    const userId = userRecords[0].id;
 
     // Check if any screenshot is too large
     let totalSize = 0;
@@ -73,38 +83,46 @@ export default async function handler(req, res) {
       // Estimate base64 size
       const base64Size = (screenshot.length * 3) / 4;
       totalSize += base64Size;
-      
+
       if (base64Size > MAX_ATTACHMENT_SIZE) {
-        return res.status(400).json({ 
-          message: 'One or more screenshots are too large. Please reduce their size and try again.',
-          error: 'SCREENSHOT_TOO_LARGE'
+        return res.status(400).json({
+          message:
+            "One or more screenshots are too large. Please reduce their size and try again.",
+          error: "SCREENSHOT_TOO_LARGE",
         });
       }
     }
 
     // Get all submissions and find if this app has already been shipped
-    console.log('Checking for existing submission for appId:', appId);
-    const allSubmissions = await base('YSWS Project Submission')
+    console.log("Checking for existing submission for appId:", appId);
+    const allSubmissions = await base("YSWS Project Submission")
       .select({
-        filterByFormula: 'NOT({app} = BLANK())',
-        maxRecords: 100
+        filterByFormula: "NOT({app} = BLANK())",
+        maxRecords: 100,
       })
       .firstPage();
 
     // Find the submission where the Apps array contains our appId
-    const existingSubmission = allSubmissions.find(sub => {
+    const existingSubmission = allSubmissions.find((sub) => {
       const apps = sub.fields.App;
-      console.log('Checking submission App:', apps, 'Type:', typeof apps, 'Is Array:', Array.isArray(apps));
+      console.log(
+        "Checking submission App:",
+        apps,
+        "Type:",
+        typeof apps,
+        "Is Array:",
+        Array.isArray(apps),
+      );
       return Array.isArray(apps) && apps.includes(appId);
     });
 
-    console.log('Existing submission found:', existingSubmission?.id);
+    console.log("Existing submission found:", existingSubmission?.id);
 
     // Find if a submission exists with the same Email and Code URL
-    const duplicateSubmissions = await base('YSWS Project Submission')
+    const duplicateSubmissions = await base("YSWS Project Submission")
       .select({
         filterByFormula: `AND({Email} = '${email}', {Code URL} = '${codeUrl}')`,
-        maxRecords: 1
+        maxRecords: 1,
       })
       .firstPage();
 
@@ -116,87 +134,90 @@ export default async function handler(req, res) {
       "How can we improve?": howCanWeImprove,
       "First Name": firstName,
       "Last Name": lastName,
-      "Email": email,
-      "Screenshot": screenshots.map(url => ({ url })), // Airtable expects an array of objects with url property
-      "Description": description,
+      Email: email,
+      Screenshot: screenshots.map((url) => ({ url })), // Airtable expects an array of objects with url property
+      Description: description,
       "GitHub Username": githubUsername,
       "Address (Line 1)": addressLine1,
-      "Address (Line 2)": addressLine2 || '',
-      "City": city,
+      "Address (Line 2)": addressLine2 || "",
+      City: city,
       "State / Province": stateProvince,
-      "Country": country,
+      Country: country,
       "ZIP / Postal Code": zipCode,
-      "Birthday": birthday,
-      "app": [appId] // Link to the app record
+      Birthday: birthday,
+      app: [appId], // Link to the app record
+      neighbors: [userId],
     };
 
     // Create a separate fields object for ShipLog that includes changesMade
     const shipLogFields = {
       ...submissionFields,
-      "changesMade": req.body.changesMade || ''
+      changesMade: req.body.changesMade || "",
     };
 
     let record;
     if (duplicateSubmissions.length > 0) {
       // Update the duplicate record
       const duplicate = duplicateSubmissions[0];
-      console.log('Updating duplicate submission (same Email and Code URL):', duplicate.id);
-      record = await base('YSWS Project Submission').update([
+      console.log(
+        "Updating duplicate submission (same Email and Code URL):",
+        duplicate.id,
+      );
+      record = await base("YSWS Project Submission").update([
         {
           id: duplicate.id,
-          fields: submissionFields
-        }
+          fields: submissionFields,
+        },
       ]);
 
       // Always add a new ShipLog record with changesMade
-      await base('ShipLog').create([
+      await base("ShipLog").create([
         {
-          fields: shipLogFields
-        }
+          fields: shipLogFields,
+        },
       ]);
     } else if (existingSubmission) {
       // Update existing submission (by appId logic)
-      console.log('Updating existing submission:', existingSubmission.id);
-      record = await base('YSWS Project Submission').update([
+      console.log("Updating existing submission:", existingSubmission.id);
+      record = await base("YSWS Project Submission").update([
         {
           id: existingSubmission.id,
-          fields: submissionFields
-        }
+          fields: submissionFields,
+        },
       ]);
 
       // Always add a new ShipLog record with changesMade
-      await base('ShipLog').create([
+      await base("ShipLog").create([
         {
-          fields: shipLogFields
-        }
+          fields: shipLogFields,
+        },
       ]);
     } else {
       // Create new submission
-      console.log('Creating new submission for appId:', appId);
-      record = await base('YSWS Project Submission').create([
-        { fields: submissionFields }
+      console.log("Creating new submission for appId:", appId);
+      record = await base("YSWS Project Submission").create([
+        { fields: submissionFields },
       ]);
 
       // Always add a new ShipLog record with changesMade
-      await base('ShipLog').create([
+      await base("ShipLog").create([
         {
-          fields: shipLogFields
-        }
+          fields: shipLogFields,
+        },
       ]);
     }
 
     // Return both the record and whether it was an update
     return res.status(200).json({
-      message: 'App shipped successfully',
+      message: "App shipped successfully",
       record: record[0],
-      wasUpdate: !!existingSubmission
+      wasUpdate: !!existingSubmission,
     });
-
   } catch (error) {
-    console.error('Error shipping app:', error);
+    console.error("Error shipping app:", error);
     return res.status(500).json({
-      message: 'Error shipping app',
-      error: error.message
+      message: "Error shipping app",
+      error: error.message,
     });
   }
-} 
+}

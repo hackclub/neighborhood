@@ -45,6 +45,13 @@ export default async function handler(req, res) {
 
   const { email } = req.body;
 
+  // Check email is valid with regex
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!email || !emailRegex.test(email)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
   if (!email) {
     return res.status(400).json({ message: "Email is required" });
   }
@@ -69,16 +76,18 @@ export default async function handler(req, res) {
 
   // Update hacktendoSignup in neighbors table
   // Find the record with the matching email
-  const neighborsRecords = await base("neighbors").select({
-    filterByFormula: `LOWER({Email}) = '${normalizedEmail}'`,
-    maxRecords: 1
-  }).firstPage();
+  const neighborsRecords = await base("neighbors")
+    .select({
+      filterByFormula: `LOWER({Email}) = '${normalizedEmail}'`,
+      maxRecords: 1,
+    })
+    .firstPage();
   if (neighborsRecords.length > 0) {
     const recordId = neighborsRecords[0].id;
     await base("neighbors").update(recordId, {
-      hacktendoSignup: true
+      hacktendoSignup: true,
     });
   }
 
   return res.status(200).json({ message: "OTP sent successfully" });
-} 
+}

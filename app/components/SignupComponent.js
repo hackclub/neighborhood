@@ -105,10 +105,12 @@ export default function SignupComponent({ setHasSignedIn }) {
 
   const handleEmailSubmit = async (e) => {
     if (e.key === 'Enter' && email) {
+      document.getElementById('email-input').disabled = true;
       const formattedEmail = email.toLowerCase().trim();
       
       if (!isValidEmail(formattedEmail)) {
         setError('Please enter a valid email address');
+        document.getElementById('email-input').disabled = false;
         return;
       }
 
@@ -128,9 +130,11 @@ export default function SignupComponent({ setHasSignedIn }) {
           setError('');
           setStage(1);
         } else {
+          document.getElementById('email-input').disabled = false;
           setError(data.message || 'An error occurred');
         }
       } catch (err) {
+        document.getElementById('email-input').disabled = false;
         setError('Failed to connect to the server');
         console.error('Error:', err);
       }
@@ -316,6 +320,7 @@ export default function SignupComponent({ setHasSignedIn }) {
                 }}>
                   <input
                     type="email"
+                    id="email-input"
                     placeholder="Enter your email"
                     value={email}
                     onChange={handleEmailChange}

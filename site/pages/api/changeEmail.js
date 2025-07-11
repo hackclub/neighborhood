@@ -30,6 +30,30 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Email and OTP are required" });
   }
 
+  // Validate email format with regex + token format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  if (!emailRegex.test(email)) {
+    console.log("Invalid email format:", email);
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
+  if (!tokenRegex.test(token)) {
+    console.log("Invalid token format:", token);
+    return res.status(400).json({ message: "Invalid token format" });
+  }
+  if (!otp || otp.length < 4 || otp.length > 6) {
+    console.log("Invalid OTP length:", otp);
+    return res.status(400).json({ message: "Invalid OTP length" });
+  }
+  if (typeof otp !== "string") {
+    console.log("OTP must be a string:", otp);
+    return res.status(400).json({ message: "OTP must be a string" });
+  }
+  if (otp.includes(" ")) {
+    console.log("OTP should not contain spaces:", otp);
+    return res.status(400).json({ message: "OTP should not contain spaces" });
+  }
   try {
     // Sanitize the input OTP
     const sanitizedOTP = sanitizeOTP(otp);

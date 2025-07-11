@@ -4,6 +4,10 @@ const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
 );
 
+// Validation regex patterns
+const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ message: "Method not allowed" });
@@ -15,11 +19,21 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Token and app ID are required" });
   }
 
+  // Validate token format
+  if (!tokenRegex.test(token)) {
+    return res.status(400).json({ message: "Invalid token format" });
+  }
+
+  // Validate appId format
+  if (!recordIdRegex.test(appId)) {
+    return res.status(400).json({ message: "Invalid app ID format" });
+  }
+
   try {
-    // Get user data from token
+    // Get user data from token - using escapeString to prevent formula injection
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${token.replace(/'/g, "\\'")}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -30,7 +44,7 @@ export default async function handler(req, res) {
 
     const userId = userRecords[0].id;
 
-    // Get the app
+    // Get the app - using proper ID format validation (already validated above)
     const appRecords = await base("Apps")
       .select({
         filterByFormula: `RECORD_ID() = '${appId}'`,
@@ -48,12 +62,16 @@ export default async function handler(req, res) {
     // Check if app is joinable
     const isJoinable = app.fields.is_joinable || false;
     if (!isJoinable) {
-      return res.status(403).json({ message: "This app is not currently joinable" });
+      return res
+        .status(403)
+        .json({ message: "This app is not currently joinable" });
     }
 
     // Check if user is already a member
     if (currentNeighbors.includes(userId)) {
-      return res.status(400).json({ message: "You're already a member of this app" });
+      return res
+        .status(400)
+        .json({ message: "You're already a member of this app" });
     }
 
     // Add user to the app's Neighbors
@@ -61,14 +79,14 @@ export default async function handler(req, res) {
       {
         id: appId,
         fields: {
-          Neighbors: [...currentNeighbors, userId]
+          Neighbors: [...currentNeighbors, userId],
         },
       },
     ]);
 
     // Get the complete app details
     const completeApp = await base("Apps").find(appId);
-    
+
     // Format the response with all necessary fields
     const appData = {
       id: completeApp.id,
@@ -78,15 +96,17 @@ export default async function handler(req, res) {
       githubLink: completeApp.fields["Github Link"] || "",
       description: completeApp.fields.Description || "",
       createdAt: completeApp.fields.createdAt || null,
-      images: completeApp.fields.Images ? completeApp.fields.Images.split(',') : []
+      images: completeApp.fields.Images
+        ? completeApp.fields.Images.split(",")
+        : [],
     };
 
     return res.status(200).json({
       message: "Successfully joined app",
-      app: appData
+      app: appData,
     });
   } catch (error) {
     console.error("Error joining app:", error);
     return res.status(500).json({ message: "Failed to join app" });
   }
-} 
+}

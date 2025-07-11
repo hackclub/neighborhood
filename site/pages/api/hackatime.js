@@ -8,8 +8,12 @@ const base = new Airtable({
 export default async function handler(req, res) {
   const { userId, token } = req.query;
 
-  if (!userId || !token) {
-    return res.status(400).json({ message: "UserId and token are required" });
+  // check userID and token with regex (user id is just a airtable )
+
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/; // Adjust length as needed
+
+  if (!userId || !token || !tokenRegex.test(token)) {
+    return res.status(400).json({ message: "Invalid userId or token format" });
   }
 
   try {

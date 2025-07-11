@@ -11,6 +11,12 @@ export default async function handler(req, res) {
 
   const { token, app, start_time, end_time, git_username } = req.query;
 
+  // Regex for validating token
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  if (!token || !tokenRegex.test(token)) {
+    return res.status(400).json({ message: "Invalid or missing token" });
+  }
+
   if (!token || !app || !start_time || !end_time || !git_username) {
     return res.status(400).json({ message: "Missing required parameters" });
   }

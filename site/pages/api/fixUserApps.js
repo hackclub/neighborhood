@@ -11,6 +11,13 @@ export default async function handler(req, res) {
 
   const { token, appId } = req.body;
 
+  // Check the token with a regex
+
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  if (!token || !tokenRegex.test(token)) {
+    return res.status(400).json({ message: "Invalid or missing token" });
+  }
+
   if (!token) {
     return res.status(400).json({ message: "Token is required" });
   }
@@ -46,58 +53,62 @@ export default async function handler(req, res) {
 
       const app = appRecords[0];
       const currentNeighbors = app.fields.Neighbors || [];
-      
+
       if (currentNeighbors.includes(userId)) {
-        return res.status(200).json({ message: "User is already assigned to this app" });
+        return res
+          .status(200)
+          .json({ message: "User is already assigned to this app" });
       }
-      
+
       // Add user to neighbors
       const updatedApp = await base("Apps").update([
         {
           id: appId,
           fields: {
-            Neighbors: [...currentNeighbors, userId]
+            Neighbors: [...currentNeighbors, userId],
           },
         },
       ]);
-      
-      return res.status(200).json({ 
-        message: "User successfully assigned to app", 
-        app: updatedApp[0].id 
+
+      return res.status(200).json({
+        message: "User successfully assigned to app",
+        app: updatedApp[0].id,
       });
     } else {
       // If no appId is provided, find all unassigned apps and check if any match the current user's
       const allApps = await base("Apps").select().all();
-      
-      const unassignedApps = allApps.filter(app => 
-        !app.fields.Neighbors || app.fields.Neighbors.length === 0
+
+      const unassignedApps = allApps.filter(
+        (app) => !app.fields.Neighbors || app.fields.Neighbors.length === 0,
       );
-      
+
       console.log(`Found ${unassignedApps.length} unassigned apps`);
-      
+
       // Update them all to include this user
       if (unassignedApps.length > 0) {
-        const updates = unassignedApps.map(app => ({
+        const updates = unassignedApps.map((app) => ({
           id: app.id,
           fields: {
-            Neighbors: [userId]
-          }
+            Neighbors: [userId],
+          },
         }));
-        
+
         const updatedApps = await base("Apps").update(updates);
-        
+
         return res.status(200).json({
           message: `Successfully assigned user to ${updatedApps.length} app(s)`,
-          apps: updatedApps.map(app => app.id)
+          apps: updatedApps.map((app) => app.id),
         });
       } else {
         return res.status(200).json({
-          message: "No unassigned apps found to fix"
+          message: "No unassigned apps found to fix",
         });
       }
     }
   } catch (error) {
     console.error("Error fixing user apps:", error);
-    return res.status(500).json({ message: "Error fixing user apps", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Error fixing user apps", error: error.message });
   }
-} 
+}
