@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -35,18 +36,19 @@ export default async function handler(req, res) {
 
   const { id } = req.query;
 
-  // check if id is a valid Airtable record ID with regex
-  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
-  if (!recordIdRegex.test(id)) {
-    return res.status(400).json({ message: "Invalid post ID format" });
-  }
-
   if (!id) {
     return res.status(400).json({ message: "Post ID is required" });
   }
 
+  const cleanedId = cleanString(id);
+  
+  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
+  if (!cleanedId || !recordIdRegex.test(cleanedId)) {
+    return res.status(400).json({ message: "Invalid or missing post ID" });
+  }
+
   try {
-    const record = await base("Posts").find(id);
+    const record = await base("Posts").find(cleanedId);
 
     // Get app and neighbor names
     const appId = record.fields.app;

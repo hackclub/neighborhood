@@ -1,4 +1,5 @@
 import Airtable from 'airtable';
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY
@@ -17,14 +18,17 @@ export default async function handler(req, res) {
   }
 
   const { email } = req.body;
+  
   if (!email) {
     return res.status(400).json({ message: 'Email is required' });
   }
 
+  const cleanedEmail = cleanString(email);
+
   try {
     // Add the email to the RSVP table
     await base('RSVP').create([
-      { fields: { Email: email } }
+      { fields: { Email: cleanedEmail } }
     ]);
     return res.status(200).json({ message: 'RSVP recorded' });
   } catch (error) {

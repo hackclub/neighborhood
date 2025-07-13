@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
@@ -45,18 +46,18 @@ export default async function handler(req, res) {
 
   const { email } = req.body;
 
-  // Check email is valid with regex
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email)) {
-    return res.status(400).json({ message: "Invalid email format" });
-  }
-
   if (!email) {
     return res.status(400).json({ message: "Email is required" });
   }
 
-  const normalizedEmail = email.trim().toLowerCase();
+  const cleanedEmail = cleanString(email);
+
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!cleanedEmail || !emailRegex.test(cleanedEmail)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+
+  const normalizedEmail = cleanedEmail.trim().toLowerCase();
 
   const otp = generateOTP();
 

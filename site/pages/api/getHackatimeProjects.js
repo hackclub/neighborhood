@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -11,18 +12,23 @@ export default async function handler(req, res) {
 
   const { slackId, userId } = req.query;
 
-  // Validate required parameters with regex
-
   if (!slackId || !userId) {
     return res.status(400).json({
       error: `Missing required parameters. Received: slackId=${slackId}, userId=${userId}`,
     });
   }
 
+  const cleanedSlackId = cleanString(slackId);
+  const cleanedUserId = cleanString(userId);
+
+  if (!cleanedSlackId || !cleanedUserId) {
+    return res.status(400).json({ error: "Invalid parameters" });
+  }
+
   try {
     // Fetch Hackatime data directly from their API
-    const hackatimeUrl = `https://hackatime.hackclub.com/api/v1/users/${slackId}/stats?features=projects&start_date=2025-04-30`;
-    console.log(`[DEBUG] Fetching Hackatime data for slackId: ${slackId}`);
+    const hackatimeUrl = `https://hackatime.hackclub.com/api/v1/users/${cleanedSlackId}/stats?features=projects&start_date=2025-04-30`;
+    console.log(`[DEBUG] Fetching Hackatime data for slackId: ${cleanedSlackId}`);
     let hackatimeResponse;
     try {
       hackatimeResponse = await fetch(hackatimeUrl, {
@@ -78,7 +84,7 @@ export default async function handler(req, res) {
     // Get all project names
     const projectNames = hackatimeData.data.projects.map((p) => p.name);
     console.log("\n=== [DEBUG] Project Details ===");
-    console.log("Current User ID:", userId);
+    console.log("Current User ID:", cleanedUserId);
     console.log("Project names from Hackatime:", projectNames);
 
     // Safety check for empty projects array
@@ -114,18 +120,18 @@ export default async function handler(req, res) {
         error: `Airtable query failed`,
         stack: err.stack,
         filterFormula,
-        userId,
+        userId: cleanedUserId,
       });
     }
 
     console.log("\n=== [DEBUG] Airtable Project Details ===");
-    console.log("Current User ID:", userId);
+    console.log("Current User ID:", cleanedUserId);
     existingProjects.forEach((p) => {
-      const isUserNeighbor = (p.fields.neighbor || []).includes(userId);
+      const isUserNeighbor = (p.fields.neighbor || []).includes(cleanedUserId);
       console.log(`\nProject "${p.fields.name}" (${p.id}):`, {
         name: p.fields.name,
         recordId: p.id,
-        currentUserId: userId,
+        currentUserId: cleanedUserId,
         rawNeighborField: p.fields.neighbor,
         neighborIds: p.fields.neighbor || [],
         neighborCount: (p.fields.neighbor || []).length,
@@ -140,14 +146,14 @@ export default async function handler(req, res) {
 
     // First pass: gather all project statuses
     console.log("\n=== [DEBUG] Processing Project Statuses ===");
-    console.log("Current User ID:", userId);
+    console.log("Current User ID:", cleanedUserId);
     existingProjects.forEach((project) => {
       const neighborIds = project.fields.neighbor || [];
-      const isUserProject = neighborIds.includes(userId);
+      const isUserProject = neighborIds.includes(cleanedUserId);
 
       console.log(`\nProject "${project.fields.name}":`, {
         projectId: project.id,
-        currentUserId: userId,
+        currentUserId: cleanedUserId,
         neighborField: {
           raw: project.fields.neighbor,
           processed: neighborIds,
@@ -155,11 +161,11 @@ export default async function handler(req, res) {
           includesUser: isUserProject,
         },
         userCheck: {
-          userId: userId,
+          userId: cleanedUserId,
           isInNeighbors: isUserProject,
           neighborContents: neighborIds,
           exactComparison: neighborIds.map(
-            (id) => `${id} === ${userId} : ${id === userId}`,
+            (id) => `${id} === ${cleanedUserId} : ${id === cleanedUserId}`,
           ),
         },
         apps: {
@@ -226,8 +232,8 @@ export default async function handler(req, res) {
       error: "Unexpected error in getHackatimeProjects",
       message: error.message,
       stack: error.stack,
-      slackId,
-      userId,
+      slackId: cleanedSlackId,
+      userId: cleanedUserId,
     });
   }
 }

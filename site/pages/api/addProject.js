@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -12,13 +13,19 @@ export default async function handler(req, res) {
 
   const { token, projectName, githubLink } = req.body;
 
+  const sanitizedToken = cleanString(token).trim();
+  
+  const sanitizedProjectName = cleanString(projectName).trim().substring(0, 100);
+  
+  const sanitizedGithubLink = cleanString(githubLink || "").trim();
+
   // check token is valid with regecx
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  if (!token || !tokenRegex.test(token)) {
+  if (!sanitizedToken || !tokenRegex.test(sanitizedToken)) {
     return res.status(400).json({ message: "Invalid or missing token" });
   }
 
-  if (!token || !projectName) {
+  if (!sanitizedToken || !sanitizedProjectName) {
     return res
       .status(400)
       .json({ message: "Token and project name are required" });
@@ -28,7 +35,7 @@ export default async function handler(req, res) {
     // First, find the user by token
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${sanitizedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -42,7 +49,7 @@ export default async function handler(req, res) {
     // Check if project already exists
     const existingProjects = await base("hackatimeProjects")
       .select({
-        filterByFormula: `{name} = '${projectName}'`,
+        filterByFormula: `{name} = '${sanitizedProjectName}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -58,8 +65,8 @@ export default async function handler(req, res) {
     const projectRecord = await base("hackatimeProjects").create([
       {
         fields: {
-          name: projectName,
-          githubLink: githubLink || "",
+          name: sanitizedProjectName,
+          githubLink: sanitizedGithubLink,
           neighbor: [userRecord.id], // Link to neighbor record
         },
       },

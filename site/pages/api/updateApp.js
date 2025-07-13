@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -34,11 +35,22 @@ export default async function handler(req, res) {
     hackatimeProjectGithubLinks,
   } = req.body;
 
+  const cleanedToken = cleanString(token);
+  const cleanedAppId = cleanString(appId);
+  const cleanedName = cleanString(name).trim().substring(0, 100);
+  const cleanedAppLink = cleanString(appLink).trim();
+  const cleanedGithubLink = cleanString(githubLink).trim();
+  const cleanedDescription = cleanString(description).trim().substring(0, 1000);
+
   // Check if token & appId are valid with regex
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
   const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
-  if (!token || !tokenRegex.test(token)) {
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid or missing token" });
+  }
+  
+  if (!cleanedAppId || !recordIdRegex.test(cleanedAppId)) {
+    return res.status(400).json({ message: "Invalid or missing app ID" });
   }
 
   // Debug request
@@ -53,11 +65,11 @@ export default async function handler(req, res) {
     console.log("Icon format:", icon.substring(0, 30) + "...");
   }
 
-  if (!token || !appId || !name) {
+  if (!cleanedToken || !cleanedAppId || !cleanedName) {
     console.log("Missing required fields:", {
-      hasToken: !!token,
-      hasAppId: !!appId,
-      hasName: !!name,
+      hasToken: !!cleanedToken,
+      hasAppId: !!cleanedAppId,
+      hasName: !!cleanedName,
     });
     return res
       .status(400)
@@ -68,7 +80,7 @@ export default async function handler(req, res) {
     // Get user data from token
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -82,7 +94,7 @@ export default async function handler(req, res) {
     // Get the app to verify ownership
     const appRecords = await base("Apps")
       .select({
-        filterByFormula: `RECORD_ID() = '${appId}'`,
+        filterByFormula: `RECORD_ID() = '${cleanedAppId}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -115,9 +127,10 @@ export default async function handler(req, res) {
       console.log("Processing Hackatime projects:", hackatimeProjects);
 
       // First, get all existing projects with these names
+      const cleanedProjectNames = hackatimeProjects.map(name => cleanString(name).trim().substring(0, 100));
       const existingProjects = await base("hackatimeProjects")
         .select({
-          filterByFormula: `OR(${hackatimeProjects.map((name) => `{name} = '${name}'`).join(",")})`,
+          filterByFormula: `OR(${cleanedProjectNames.map((name) => `{name} = '${name}'`).join(",")})`,
         })
         .all();
 
@@ -133,7 +146,7 @@ export default async function handler(req, res) {
 
       // Get current app's existing projects to preserve them
       const currentAppProjects = existingProjects.filter((p) =>
-        (p.fields.Apps || []).includes(appId),
+        (p.fields.Apps || []).includes(cleanedAppId),
       );
       console.log(
         "Current app's existing projects:",
@@ -153,9 +166,11 @@ export default async function handler(req, res) {
       });
 
       // For each project name
-      for (const projectName of hackatimeProjects) {
+      for (let i = 0; i < hackatimeProjects.length; i++) {
+        const projectName = hackatimeProjects[i];
+        const cleanedProjectName = cleanedProjectNames[i];
         const existingProjectsForName =
-          existingProjectsByName.get(projectName) || [];
+          existingProjectsByName.get(cleanedProjectName) || [];
 
         // Find if user already has a project with this name
         const userProject = existingProjectsForName.find((p) =>
@@ -173,17 +188,19 @@ export default async function handler(req, res) {
           );
 
           // Update GitHub link
+          const cleanedGithubLink = cleanString(hackatimeProjectGithubLinks?.[projectName] || "").trim();
           await base("hackatimeProjects").update(userProject.id, {
-            githubLink: hackatimeProjectGithubLinks?.[projectName] || "",
+            githubLink: cleanedGithubLink,
           });
         } else {
           // Create new project for this user
-          console.log(`Creating new project for ${projectName}`);
+          console.log(`Creating new project for ${cleanedProjectName}`);
           try {
+            const cleanedGithubLink = cleanString(hackatimeProjectGithubLinks?.[projectName] || "").trim();
             const newProject = await base("hackatimeProjects").create({
-              name: projectName,
+              name: cleanedProjectName,
               neighbor: [userId],
-              githubLink: hackatimeProjectGithubLinks?.[projectName] || "",
+              githubLink: cleanedGithubLink,
             });
             hackatimeProjectIds.push(newProject.id);
             console.log(
@@ -204,10 +221,10 @@ export default async function handler(req, res) {
 
     // Update app fields
     const appFields = {
-      Name: name,
-      "App Link": appLink || "",
-      "Github Link": githubLink || "",
-      Description: description || "",
+      Name: cleanedName,
+      "App Link": cleanedAppLink || "",
+      "Github Link": cleanedGithubLink || "",
+      Description: cleanedDescription || "",
       hackatimeProjects: hackatimeProjectIds,
     };
 
@@ -253,7 +270,7 @@ export default async function handler(req, res) {
     console.log("Updating app with fields:", Object.keys(appFields));
     const updatedApp = await base("Apps").update([
       {
-        id: appId,
+        id: cleanedAppId,
         fields: appFields,
       },
     ]);
@@ -261,7 +278,7 @@ export default async function handler(req, res) {
 
     // Get the updated app to return full details
     console.log("\n=== FETCHING APP DETAILS ===");
-    const refreshedApp = await base("Apps").find(appId);
+    const refreshedApp = await base("Apps").find(cleanedAppId);
 
     console.log("App fields available:", Object.keys(refreshedApp.fields));
     console.log(
@@ -298,7 +315,8 @@ export default async function handler(req, res) {
         }
 
         // Now fetch all projects in one go
-        const formula = `OR(${refreshedApp.fields.hackatimeProjects.map((id) => `RECORD_ID() = '${id}'`).join(",")})`;
+        const cleanedProjectIds = refreshedApp.fields.hackatimeProjects.map(id => cleanString(id).trim());
+        const formula = `OR(${cleanedProjectIds.map((id) => `RECORD_ID() = '${id}'`).join(",")})`;
         console.log("Using formula:", formula);
 
         const projectRecords = await base("hackatimeProjects")

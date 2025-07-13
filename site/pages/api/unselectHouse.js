@@ -1,4 +1,5 @@
 import Airtable from 'airtable';
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -29,18 +30,20 @@ export default async function handler(req, res) {
     return res.status(401).json({ message: 'No token provided' });
   }
 
+  const cleanedToken = cleanString(token);
+
   try {
     // Find the user with this token
-    console.log('Looking up user with token:', token.substring(0, 5) + '...');
+    console.log('Looking up user with token:', cleanedToken.substring(0, 5) + '...');
     const userRecords = await base("neighbors")
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1
       })
       .firstPage();
 
     if (userRecords.length === 0) {
-      console.log('No user found for token:', token.substring(0, 5) + '...');
+      console.log('No user found for token:', cleanedToken.substring(0, 5) + '...');
       return res.status(404).json({ message: 'User not found' });
     }
 

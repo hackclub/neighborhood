@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -40,23 +41,30 @@ export default async function handler(req, res) {
     hackatimeProjectGithubLinks,
   } = req.body;
 
+  const cleanedToken = cleanString(token);
+  const cleanedName = cleanString(name);
+  const cleanedAppLink = cleanString(appLink);
+  const cleanedGithubLink = cleanString(githubLink);
+  const cleanedDescription = cleanString(description);
+  const cleanedIcon = cleanString(icon);
+
   // Validate input parameters
-  if (!tokenRegex.test(token)) {
+  if (!tokenRegex.test(cleanedToken)) {
     console.log("Invalid token format");
     return res.status(400).json({ message: "Invalid token format" });
   }
 
-  if (name && !nameRegex.test(name)) {
+  if (cleanedName && !nameRegex.test(cleanedName)) {
     console.log("Invalid name format");
     return res.status(400).json({ message: "Invalid app name format" });
   }
 
-  if (appLink && !urlRegex.test(appLink)) {
+  if (cleanedAppLink && !urlRegex.test(cleanedAppLink)) {
     console.log("Invalid app link format");
     return res.status(400).json({ message: "Invalid app link format" });
   }
 
-  if (githubLink && !urlRegex.test(githubLink)) {
+  if (cleanedGithubLink && !urlRegex.test(cleanedGithubLink)) {
     console.log("Invalid GitHub link format");
     return res.status(400).json({ message: "Invalid GitHub link format" });
   }
@@ -86,10 +94,10 @@ export default async function handler(req, res) {
     console.log("Icon format:", icon.substring(0, 30) + "...");
   }
 
-  if (!token || !name) {
+  if (!cleanedToken || !cleanedName) {
     console.log("Missing required fields:", {
-      hasToken: !!token,
-      hasName: !!name,
+      hasToken: !!cleanedToken,
+      hasName: !!cleanedName,
     });
     return res.status(400).json({ message: "Token and app name are required" });
   }
@@ -97,10 +105,9 @@ export default async function handler(req, res) {
   try {
     // Get user data from token
     console.log("Fetching user data from token");
-    const safeToken = token.replace(/'/g, "\\'"); // Escape single quotes to prevent formula injection
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${safeToken}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -119,9 +126,8 @@ export default async function handler(req, res) {
       console.log("Processing Hackatime projects:", hackatimeProjects);
 
       // First, get all existing projects with these names
-      // Escape project names to prevent formula injection
       const safeProjectNames = hackatimeProjects.map(
-        (name) => `{name} = '${name.replace(/'/g, "\\'")}'`,
+        (name) => `{name} = '${cleanString(name)}'`,
       );
       const existingProjects = await base("hackatimeProjects")
         .select({
@@ -168,7 +174,7 @@ export default async function handler(req, res) {
 
           // Update GitHub link if provided
           if (hackatimeProjectGithubLinks?.[projectName]) {
-            const gitLink = hackatimeProjectGithubLinks[projectName];
+            const gitLink = cleanString(hackatimeProjectGithubLinks[projectName]);
             // Validate GitHub link format
             if (gitLink && urlRegex.test(gitLink)) {
               await base("hackatimeProjects").update(userProject.id, {
@@ -187,8 +193,9 @@ export default async function handler(req, res) {
             // Validate and sanitize GitHub link if provided
             let gitLink = "";
             if (hackatimeProjectGithubLinks?.[projectName]) {
-              gitLink = urlRegex.test(hackatimeProjectGithubLinks[projectName])
-                ? hackatimeProjectGithubLinks[projectName]
+              const cleanedGitLink = cleanString(hackatimeProjectGithubLinks[projectName]);
+              gitLink = urlRegex.test(cleanedGitLink)
+                ? cleanedGitLink
                 : "";
             }
 
@@ -211,14 +218,14 @@ export default async function handler(req, res) {
     }
 
     // Create app fields without image data - sanitize inputs
-    const sanitizedDescription = description
-      ? description.substring(0, 1000)
-      : ""; // Limit description length
+    const sanitizedDescription = cleanedDescription
+      ? cleanedDescription.substring(0, 1000)
+      : "";
 
     const appFields = {
-      Name: name,
-      "App Link": appLink || "",
-      "Github Link": githubLink || "",
+      Name: cleanedName,
+      "App Link": cleanedAppLink || "",
+      "Github Link": cleanedGithubLink || "",
       Description: sanitizedDescription,
       Neighbors: [userId],
       hackatimeProjects: hackatimeProjectIds,
@@ -226,19 +233,18 @@ export default async function handler(req, res) {
     console.log("Prepared app fields:", Object.keys(appFields));
 
     // Handle icon URL
-    if (icon && typeof icon === "string") {
+    if (cleanedIcon && typeof cleanedIcon === "string") {
       console.log("Processing icon data");
 
-      if (icon.startsWith("http://") || icon.startsWith("https://")) {
+      if (cleanedIcon.startsWith("http://") || cleanedIcon.startsWith("https://")) {
         console.log(
           "Using direct URL for icon:",
-          icon.substring(0, 50) + "...",
+          cleanedIcon.substring(0, 50) + "...",
         );
-        appFields.Icon = icon;
+        appFields.Icon = cleanedIcon;
         console.log("Set icon URL as text");
       } else {
         console.log("Invalid icon format - must be a URL");
-        // Don't set invalid icon URLs
       }
     }
 
@@ -247,11 +253,13 @@ export default async function handler(req, res) {
       console.log("Processing images:", images.length);
       // Filter out any non-URL values and join with commas
       const validUrls = images.filter(
-        (url) =>
-          typeof url === "string" &&
-          (url.startsWith("http://") || url.startsWith("https://")) &&
-          urlRegex.test(url),
-      );
+        (url) => {
+          const cleanedUrl = cleanString(url);
+          return typeof cleanedUrl === "string" &&
+          (cleanedUrl.startsWith("http://") || cleanedUrl.startsWith("https://")) &&
+          urlRegex.test(cleanedUrl);
+        }
+      ).map(url => cleanString(url));
       if (validUrls.length > 0) {
         // Limit the number of images to prevent excessively large entries
         const limitedUrls = validUrls.slice(0, 10);

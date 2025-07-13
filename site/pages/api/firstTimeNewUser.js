@@ -1,5 +1,6 @@
 import Airtable from "airtable";
 import crypto from "crypto";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -18,27 +19,31 @@ export default async function handler(req, res) {
 
   const { email, fullName, birthday } = req.body;
 
-  // Validate required fields with regex
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  const fullNameRegex = /^[a-zA-Z\s]+$/;
-
-  if (!emailRegex.test(email)) {
-    return res.status(400).json({ message: "Invalid email format" });
-  }
-  if (!fullNameRegex.test(fullName)) {
-    return res
-      .status(400)
-      .json({ message: "Full name can only contain letters and spaces" });
-  }
-
   if (!email || !fullName || !birthday) {
     return res
       .status(400)
       .json({ message: "Email, full name, and birthday are required" });
   }
 
+  const cleanedEmail = cleanString(email);
+  const cleanedFullName = cleanString(fullName);
+  const cleanedBirthday = cleanString(birthday);
+
+  // Validate required fields with regex
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  const fullNameRegex = /^[a-zA-Z\s]+$/;
+
+  if (!emailRegex.test(cleanedEmail)) {
+    return res.status(400).json({ message: "Invalid email format" });
+  }
+  if (!fullNameRegex.test(cleanedFullName)) {
+    return res
+      .status(400)
+      .json({ message: "Full name can only contain letters and spaces" });
+  }
+
   // Normalize email by stripping whitespace and converting to lowercase
-  const normalizedEmail = email.trim().toLowerCase();
+  const normalizedEmail = cleanedEmail.trim().toLowerCase();
 
   const sendSignupEmail = async (email) => {
     const url = "https://app.loops.so/api/v1/transactional";
@@ -92,8 +97,8 @@ export default async function handler(req, res) {
         fields: {
           email: normalizedEmail,
           token: token,
-          "Full Name": fullName,
-          "Date of Birth": birthday,
+          "Full Name": cleanedFullName,
+          "Date of Birth": cleanedBirthday,
         },
       },
     ]);

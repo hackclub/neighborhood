@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -19,22 +20,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Token and app ID are required" });
   }
 
+  const cleanedToken = cleanString(token);
+  const cleanedAppId = cleanString(appId);
+
   // Validate token format
-  if (!tokenRegex.test(token)) {
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid token format" });
   }
 
   // Validate appId format
-  if (!recordIdRegex.test(appId)) {
+  if (!cleanedAppId || !recordIdRegex.test(cleanedAppId)) {
     return res.status(400).json({ message: "Invalid app ID format" });
   }
 
   try {
-    // Get user data from token - escape token to prevent formula injection
-    const safeToken = token.replace(/'/g, "\\'");
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${safeToken}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -48,7 +50,7 @@ export default async function handler(req, res) {
     // Get the app - appId has already been validated with regex
     const appRecords = await base("Apps")
       .select({
-        filterByFormula: `RECORD_ID() = '${appId}'`,
+        filterByFormula: `RECORD_ID() = '${cleanedAppId}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -74,7 +76,7 @@ export default async function handler(req, res) {
     const updatedNeighbors = currentNeighbors.filter((id) => id !== userId);
     await base("Apps").update([
       {
-        id: appId,
+        id: cleanedAppId,
         fields: {
           Neighbors: updatedNeighbors,
         },

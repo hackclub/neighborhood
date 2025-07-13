@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -52,9 +53,14 @@ export default async function handler(req, res) {
 
   const { demoVideo, photoboothVideo, description, neighbor, app } = req.body;
 
-  // Check app name and token with regex
+  const cleanedDemoVideo = cleanString(demoVideo);
+  const cleanedPhotoboothVideo = cleanString(photoboothVideo);
+  const cleanedDescription = cleanString(description);
+  const cleanedNeighbor = cleanString(neighbor);
+  const cleanedApp = cleanString(app);
+
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  if (!neighbor || !tokenRegex.test(neighbor)) {
+  if (!cleanedNeighbor || !tokenRegex.test(cleanedNeighbor)) {
     return res
       .status(400)
       .json({ message: "Invalid or missing neighbor token" });
@@ -64,12 +70,12 @@ export default async function handler(req, res) {
   const videoUrlRegex =
     /^(https?:\/\/)?(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/;
   if (
-    !description ||
-    !descriptionRegex.test(description) ||
-    !demoVideo ||
-    !videoUrlRegex.test(demoVideo) ||
-    !photoboothVideo ||
-    !videoUrlRegex.test(photoboothVideo)
+    !cleanedDescription ||
+    !descriptionRegex.test(cleanedDescription) ||
+    !cleanedDemoVideo ||
+    !videoUrlRegex.test(cleanedDemoVideo) ||
+    !cleanedPhotoboothVideo ||
+    !videoUrlRegex.test(cleanedPhotoboothVideo)
   ) {
     return res.status(400).json({
       message:
@@ -77,18 +83,16 @@ export default async function handler(req, res) {
     });
   }
 
-  if (!demoVideo || !photoboothVideo || !description || !neighbor || !app) {
+  if (!cleanedDemoVideo || !cleanedPhotoboothVideo || !cleanedDescription || !cleanedNeighbor || !cleanedApp) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  const escapedAppName = app.replaceAll("'", "''")
-
   try {
     // Look up neighbor record by token to get their email
-    let neighborId = neighbor;
+    let neighborId = cleanedNeighbor;
     try {
       const neighborRecords = await base("neighbors")
-        .select({ filterByFormula: `{token} = '${neighbor}'`, maxRecords: 1 })
+        .select({ filterByFormula: `{token} = '${cleanedNeighbor}'`, maxRecords: 1 })
         .firstPage();
       if (neighborRecords.length > 0) {
         neighborId = neighborRecords[0].id;
@@ -98,12 +102,12 @@ export default async function handler(req, res) {
     }
 
     // Look up app record by name to get its id and links
-    let appId = escapedAppName;
+    let appId = cleanedApp;
     let appLink = null;
     let githubUrl = null;
     try {
       const appRecords = await base("Apps")
-        .select({ filterByFormula: `{Name} = '${escapedAppName}'`, maxRecords: 1 })
+        .select({ filterByFormula: `{Name} = '${cleanedApp}'`, maxRecords: 1 })
         .firstPage();
       if (appRecords.length > 0) {
         appId = appRecords[0].id;
@@ -154,9 +158,9 @@ export default async function handler(req, res) {
     const newRecord = await base("Posts").create([
       {
         fields: {
-          demoVideo,
-          photoboothVideo,
-          description,
+          demoVideo: cleanedDemoVideo,
+          photoboothVideo: cleanedPhotoboothVideo,
+          description: cleanedDescription,
           neighbor: [neighborId],
           app: [appId],
           lastPost: lastPostDate,

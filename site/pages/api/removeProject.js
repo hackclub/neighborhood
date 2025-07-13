@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -12,26 +13,31 @@ export default async function handler(req, res) {
 
   const { token, projectName } = req.body;
 
-  // check token and projectName with a regex
-
-  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/; // Example regex for token
-  const projectNameRegex = /^[a-zA-Z0-9\s_-]{3,50}$/; // Example regex for project name
-
-  if (!tokenRegex.test(token)) {
-    return res.status(400).json({ message: "Invalid token format" });
-  }
-
   if (!token || !projectName) {
     return res
       .status(400)
       .json({ message: "Token and project name are required" });
   }
 
+  const cleanedToken = cleanString(token);
+  const cleanedProjectName = cleanString(projectName);
+
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  const projectNameRegex = /^[a-zA-Z0-9\s_-]{3,50}$/;
+
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
+    return res.status(400).json({ message: "Invalid token format" });
+  }
+
+  if (!cleanedProjectName || !projectNameRegex.test(cleanedProjectName)) {
+    return res.status(400).json({ message: "Invalid project name format" });
+  }
+
   try {
     // First, find the user by token
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -45,7 +51,7 @@ export default async function handler(req, res) {
     // Find the project record by name and email
     const projectRecords = await base("hackatimeProjects")
       .select({
-        filterByFormula: `{name} = '${projectName}'`,
+        filterByFormula: `{name} = '${cleanedProjectName}'`,
         maxRecords: 1,
       })
       .firstPage();
