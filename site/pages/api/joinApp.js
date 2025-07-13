@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -19,13 +20,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Token and app ID are required" });
   }
 
+  const cleanedAppId = cleanString(appId);
+
   // Validate token format
   if (!tokenRegex.test(token)) {
     return res.status(400).json({ message: "Invalid token format" });
   }
 
   // Validate appId format
-  if (!recordIdRegex.test(appId)) {
+  if (!cleanedAppId || !recordIdRegex.test(cleanedAppId)) {
     return res.status(400).json({ message: "Invalid app ID format" });
   }
 
@@ -47,7 +50,7 @@ export default async function handler(req, res) {
     // Get the app - using proper ID format validation (already validated above)
     const appRecords = await base("Apps")
       .select({
-        filterByFormula: `RECORD_ID() = '${appId}'`,
+        filterByFormula: `RECORD_ID() = '${cleanedAppId}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -77,7 +80,7 @@ export default async function handler(req, res) {
     // Add user to the app's Neighbors
     const updatedApp = await base("Apps").update([
       {
-        id: appId,
+        id: cleanedAppId,
         fields: {
           Neighbors: [...currentNeighbors, userId],
         },
@@ -85,7 +88,7 @@ export default async function handler(req, res) {
     ]);
 
     // Get the complete app details
-    const completeApp = await base("Apps").find(appId);
+    const completeApp = await base("Apps").find(cleanedAppId);
 
     // Format the response with all necessary fields
     const appData = {

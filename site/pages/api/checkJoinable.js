@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -11,21 +12,23 @@ export default async function handler(req, res) {
 
   const { appId } = req.query;
 
-  // Check app id is an airtable record ID format
-  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
-  if (!appId || !recordIdRegex.test(appId)) {
-    return res.status(400).json({ message: "Invalid or missing app ID" });
-  }
-
   if (!appId) {
     return res.status(400).json({ message: "App ID is required" });
+  }
+
+  const cleanedAppId = cleanString(appId);
+  
+  // Check app id is an airtable record ID format
+  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
+  if (!cleanedAppId || !recordIdRegex.test(cleanedAppId)) {
+    return res.status(400).json({ message: "Invalid or missing app ID" });
   }
 
   try {
     // Fetch the app record
     const appRecords = await base("Apps")
       .select({
-        filterByFormula: `RECORD_ID() = '${appId}'`,
+        filterByFormula: `RECORD_ID() = '${cleanedAppId}'`,
         maxRecords: 1,
       })
       .firstPage();

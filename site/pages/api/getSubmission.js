@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(
   process.env.AIRTABLE_BASE_ID,
@@ -15,22 +16,23 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Token and appId are required" });
   }
 
-  // Check token and app id with regex
-  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/; // Airtable record ID format
+  const cleanedToken = cleanString(token);
+  const cleanedAppId = cleanString(appId);
 
-  if (!tokenRegex.test(token)) {
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  const recordIdRegex = /^rec[a-zA-Z0-9]{14}$/;
+
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid token format" });
   }
-  if (!recordIdRegex.test(appId)) {
+  if (!cleanedAppId || !recordIdRegex.test(cleanedAppId)) {
     return res.status(400).json({ message: "Invalid app ID format" });
   }
 
   try {
-    // First, find the user by token
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -42,7 +44,7 @@ export default async function handler(req, res) {
     const user = userRecords[0];
     const userId = user.id;
 
-    console.log("Looking for submission with appId:", appId);
+    console.log("Looking for submission with appId:", cleanedAppId);
 
     // Get all submissions and filter manually since Airtable returns Apps as an array
     const allSubmissions = await base("YSWS Project Submission")
@@ -68,8 +70,7 @@ export default async function handler(req, res) {
         "Owners:",
         owners
       );
-      // auth check, why the fuck was this not here
-      return Array.isArray(apps) && apps.includes(appId) && 
+      return Array.isArray(apps) && apps.includes(cleanedAppId) && 
              Array.isArray(owners) && owners.includes(userId);
     });
 
