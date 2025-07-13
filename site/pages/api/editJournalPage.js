@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
@@ -11,25 +12,29 @@ export default async function handler(req, res) {
 
   const { token, pageNumber, serializedJournalEntry } = req.body;
 
+  const cleanedToken = cleanString(token);
+  const cleanedPageNumber = cleanString(pageNumber);
+  const cleanedSerializedJournalEntry = cleanString(serializedJournalEntry);
+
   // Validate inputs with regex
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  if (!token || !tokenRegex.test(token)) {
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid or missing token" });
   }
   const pageNumberRegex = /^\d+$/;
-  if (!pageNumber || !pageNumberRegex.test(pageNumber)) {
+  if (!cleanedPageNumber || !pageNumberRegex.test(cleanedPageNumber)) {
     return res.status(400).json({ message: "Invalid or missing pageNumber" });
   }
   if (
-    typeof serializedJournalEntry !== "string" ||
-    serializedJournalEntry.length === 0
+    typeof cleanedSerializedJournalEntry !== "string" ||
+    cleanedSerializedJournalEntry.length === 0
   ) {
     return res
       .status(400)
       .json({ message: "Invalid or missing serializedJournalEntry" });
   }
 
-  if (!token || typeof pageNumber === "undefined" || !serializedJournalEntry) {
+  if (!cleanedToken || typeof cleanedPageNumber === "undefined" || !cleanedSerializedJournalEntry) {
     return res
       .status(400)
       .json({
@@ -37,7 +42,7 @@ export default async function handler(req, res) {
       });
   }
 
-  if (Number(pageNumber) === 0) {
+  if (Number(cleanedPageNumber) === 0) {
     return res.status(200).json({ message: "Ignored: pageNumber is zero" });
   }
 
@@ -47,7 +52,7 @@ export default async function handler(req, res) {
     // Find the neighbor record by token
     const neighborRecords = await base("neighbors")
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -60,7 +65,7 @@ export default async function handler(req, res) {
     // Look up by neighborToken + pageNumber
     const existingPages = await base("journalPages")
       .select({
-        filterByFormula: `AND({neighborToken} = '${neighborToken}', {pageNumber} = ${pageNumber})`,
+        filterByFormula: `AND({neighborToken} = '${neighborToken}', {pageNumber} = ${cleanedPageNumber})`,
         maxRecords: 1,
       })
       .firstPage();
@@ -68,8 +73,8 @@ export default async function handler(req, res) {
     if (existingPages.length > 0) {
       // Update existing record
       await base("journalPages").update(existingPages[0].id, {
-        serializedJournalEntry,
-        pageNumber,
+        serializedJournalEntry: cleanedSerializedJournalEntry,
+        pageNumber: cleanedPageNumber,
       });
       return res
         .status(200)
@@ -84,8 +89,8 @@ export default async function handler(req, res) {
         {
           fields: {
             PageID: newPageID,
-            pageNumber,
-            serializedJournalEntry,
+            pageNumber: cleanedPageNumber,
+            serializedJournalEntry: cleanedSerializedJournalEntry,
             neighbor: [neighborId],
           },
         },

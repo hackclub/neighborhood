@@ -1,6 +1,6 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
-// Initialize Airtable
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID);
@@ -12,21 +12,22 @@ export default async function handler(req, res) {
 
   const { token, gender } = req.body;
 
-  // Check if token is valid with regex
-  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  if (!tokenRegex.test(token)) {
-    return res.status(400).json({ message: "Invalid token format" });
-  }
-
   if (!token || !gender) {
     return res.status(400).json({ message: "Token and gender are required" });
   }
 
+  const cleanedToken = cleanString(token);
+  const cleanedGender = cleanString(gender);
+
+  const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
+    return res.status(400).json({ message: "Invalid token format" });
+  }
+
   try {
-    // Find the user by token
     const records = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -37,12 +38,11 @@ export default async function handler(req, res) {
 
     const userId = records[0].id;
 
-    // Update the user's gender
     await base(process.env.AIRTABLE_TABLE_ID).update([
       {
         id: userId,
         fields: {
-          RoomGender: gender,
+          RoomGender: cleanedGender,
         },
       },
     ]);
