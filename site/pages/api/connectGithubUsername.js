@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
@@ -21,22 +22,22 @@ export default async function handler(req, res) {
 
   const { token, githubUsername } = req.body;
 
-  // check if token is a valid token using regex
+  const cleanedToken = cleanString(token);
+  const cleanedGithubUsername = cleanString(githubUsername);
+
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  if (!token || !tokenRegex.test(token)) {
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid or missing token" });
   }
 
-  // Check for missing fields
-  if (!token) {
+  if (!cleanedToken) {
     return res.status(400).json({ message: "Missing required field: token" });
   }
 
   try {
-    // Find the user record by token
     const userRecords = await base("neighbors")
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -47,12 +48,11 @@ export default async function handler(req, res) {
         .json({ message: "User not found for provided token" });
     }
 
-    // Update the user's GitHub username
     await base("neighbors").update([
       {
         id: userRecords[0].id,
         fields: {
-          githubUsername: githubUsername || "",
+          githubUsername: cleanedGithubUsername || "",
         },
       },
     ]);

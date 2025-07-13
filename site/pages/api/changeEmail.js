@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -30,45 +31,49 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Email and OTP are required" });
   }
 
+  const cleanedEmail = cleanString(email);
+  const cleanedOtp = cleanString(otp);
+  const cleanedToken = cleanString(token);
+
   // Validate email format with regex + token format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  if (!emailRegex.test(email)) {
-    console.log("Invalid email format:", email);
+  if (!cleanedEmail || !emailRegex.test(cleanedEmail)) {
+    console.log("Invalid email format:", cleanedEmail);
     return res.status(400).json({ message: "Invalid email format" });
   }
 
-  if (!tokenRegex.test(token)) {
-    console.log("Invalid token format:", token);
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
+    console.log("Invalid token format:", cleanedToken);
     return res.status(400).json({ message: "Invalid token format" });
   }
-  if (!otp || otp.length < 4 || otp.length > 6) {
-    console.log("Invalid OTP length:", otp);
+  if (!cleanedOtp || cleanedOtp.length < 4 || cleanedOtp.length > 6) {
+    console.log("Invalid OTP length:", cleanedOtp);
     return res.status(400).json({ message: "Invalid OTP length" });
   }
-  if (typeof otp !== "string") {
-    console.log("OTP must be a string:", otp);
+  if (typeof cleanedOtp !== "string") {
+    console.log("OTP must be a string:", cleanedOtp);
     return res.status(400).json({ message: "OTP must be a string" });
   }
-  if (otp.includes(" ")) {
-    console.log("OTP should not contain spaces:", otp);
+  if (cleanedOtp.includes(" ")) {
+    console.log("OTP should not contain spaces:", cleanedOtp);
     return res.status(400).json({ message: "OTP should not contain spaces" });
   }
   try {
     // Sanitize the input OTP
-    const sanitizedOTP = sanitizeOTP(otp);
+    const sanitizedOTP = sanitizeOTP(cleanedOtp);
 
     // Get the most recent OTP record for this email that hasn't been used
     const otpRecords = await base("OTP")
       .select({
-        filterByFormula: `AND({Email} = '${email}', {isUsed} = 0)`,
+        filterByFormula: `AND({Email} = '${cleanedEmail}', {isUsed} = 0)`,
         sort: [{ field: "createdAt", direction: "desc" }],
         maxRecords: 1,
       })
       .firstPage();
 
     if (otpRecords.length === 0) {
-      console.log("No valid OTP found for email:", email);
+      console.log("No valid OTP found for email:", cleanedEmail);
       return res.status(400).json({ message: "No valid OTP found" });
     }
 
@@ -85,7 +90,7 @@ export default async function handler(req, res) {
       // Debug info if needed
       if (process.env.NODE_ENV !== "production") {
         console.log("Original stored OTP:", latestOTP.fields.OTP);
-        console.log("Original received OTP:", otp);
+        console.log("Original received OTP:", cleanedOtp);
         console.log("Stored OTP length:", sanitizedStoredOTP.length);
         console.log("Received OTP length:", sanitizedOTP.length);
       }
@@ -106,13 +111,13 @@ export default async function handler(req, res) {
     // Get user's token from the main table
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
 
     if (userRecords.length === 0) {
-      console.log("User not found for email:", email);
+      console.log("User not found for email:", cleanedEmail);
       return res.status(404).json({ message: "User not found" });
     }
 
@@ -121,7 +126,7 @@ export default async function handler(req, res) {
       {
         id: userRecords[0].id,
         fields: {
-          email: email,
+          email: cleanedEmail,
         },
       },
     ]);

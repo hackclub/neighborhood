@@ -37,10 +37,10 @@ export default async function handler(req, res) {
 
   const cleanedToken = cleanString(token);
   const cleanedAppId = cleanString(appId);
-  const cleanedName = cleanString(name);
-  const cleanedAppLink = cleanString(appLink);
-  const cleanedGithubLink = cleanString(githubLink);
-  const cleanedDescription = cleanString(description);
+  const cleanedName = cleanString(name).trim().substring(0, 100);
+  const cleanedAppLink = cleanString(appLink).trim();
+  const cleanedGithubLink = cleanString(githubLink).trim();
+  const cleanedDescription = cleanString(description).trim().substring(0, 1000);
 
   // Check if token & appId are valid with regex
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
@@ -127,7 +127,7 @@ export default async function handler(req, res) {
       console.log("Processing Hackatime projects:", hackatimeProjects);
 
       // First, get all existing projects with these names
-      const cleanedProjectNames = hackatimeProjects.map(name => cleanString(name));
+      const cleanedProjectNames = hackatimeProjects.map(name => cleanString(name).trim().substring(0, 100));
       const existingProjects = await base("hackatimeProjects")
         .select({
           filterByFormula: `OR(${cleanedProjectNames.map((name) => `{name} = '${name}'`).join(",")})`,
@@ -188,7 +188,7 @@ export default async function handler(req, res) {
           );
 
           // Update GitHub link
-          const cleanedGithubLink = cleanString(hackatimeProjectGithubLinks?.[projectName] || "");
+          const cleanedGithubLink = cleanString(hackatimeProjectGithubLinks?.[projectName] || "").trim();
           await base("hackatimeProjects").update(userProject.id, {
             githubLink: cleanedGithubLink,
           });
@@ -196,7 +196,7 @@ export default async function handler(req, res) {
           // Create new project for this user
           console.log(`Creating new project for ${cleanedProjectName}`);
           try {
-            const cleanedGithubLink = cleanString(hackatimeProjectGithubLinks?.[projectName] || "");
+            const cleanedGithubLink = cleanString(hackatimeProjectGithubLinks?.[projectName] || "").trim();
             const newProject = await base("hackatimeProjects").create({
               name: cleanedProjectName,
               neighbor: [userId],
@@ -315,7 +315,7 @@ export default async function handler(req, res) {
         }
 
         // Now fetch all projects in one go
-        const cleanedProjectIds = refreshedApp.fields.hackatimeProjects.map(id => cleanString(id));
+        const cleanedProjectIds = refreshedApp.fields.hackatimeProjects.map(id => cleanString(id).trim());
         const formula = `OR(${cleanedProjectIds.map((id) => `RECORD_ID() = '${id}'`).join(",")})`;
         console.log("Using formula:", formula);
 

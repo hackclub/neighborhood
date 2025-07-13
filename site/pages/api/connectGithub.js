@@ -1,6 +1,6 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
-// Initialize Airtable
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID);
@@ -24,27 +24,29 @@ export default async function handler(req, res) {
       .json({ message: "Token, App Name, and GitHub link are required" });
   }
 
+  const cleanedToken = cleanString(token);
+  const cleanedProjectName = cleanString(projectName).trim().substring(0, 100);
+  const cleanedGithubLink = cleanString(githubLink).trim();
+
   // Validate token format
-  if (!tokenRegex.test(token)) {
+  if (!tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid token format" });
   }
 
   // Validate project name format
-  if (!projectNameRegex.test(projectName)) {
+  if (!projectNameRegex.test(cleanedProjectName)) {
     return res.status(400).json({ message: "Invalid project name format" });
   }
 
   // Validate GitHub link format
-  if (!urlRegex.test(githubLink)) {
+  if (!urlRegex.test(cleanedGithubLink)) {
     return res.status(400).json({ message: "Invalid GitHub link format" });
   }
 
   try {
-    // First, find the user by token - escape single quotes to prevent formula injection
-    const safeToken = token.replace(/'/g, "\\'");
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${safeToken}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -55,27 +57,20 @@ export default async function handler(req, res) {
 
     const userEmail = userRecords[0].fields.email;
 
-    // Find the project record by name and email - escape inputs to prevent formula injection
-    const safeProjectName = projectName.replace(/'/g, "\\'");
-    const safeUserEmail = userEmail.replace(/'/g, "\\'");
+    const cleanedUserEmail = cleanString(userEmail);
     const projectRecords = await base("hackatimeProjects")
       .select({
-        filterByFormula: `AND({name} = '${safeProjectName}', {email} = '${safeUserEmail}')`,
+        filterByFormula: `AND({name} = '${cleanedProjectName}', {email} = '${cleanedUserEmail}')`,
         maxRecords: 1,
       })
       .firstPage();
 
     if (projectRecords.length === 0) {
-      // If project doesn't exist, create it with the GitHub link
-      // Sanitize inputs before storing
-      const sanitizedProjectName = projectName.trim().substring(0, 100);
-      const sanitizedGithubLink = githubLink.trim();
-
       const newProject = await base("hackatimeProjects").create([
         {
           fields: {
-            name: sanitizedProjectName,
-            githubLink: sanitizedGithubLink,
+            name: cleanedProjectName,
+            githubLink: cleanedGithubLink,
             email: userEmail,
             neighbor: [userRecords[0].id],
           },
@@ -88,15 +83,11 @@ export default async function handler(req, res) {
       });
     }
 
-    // Update existing project with GitHub link
-    // Sanitize GitHub link before storing
-    const sanitizedGithubLink = githubLink.trim();
-
     const updatedProject = await base("hackatimeProjects").update([
       {
         id: projectRecords[0].id,
         fields: {
-          githubLink: sanitizedGithubLink,
+          githubLink: cleanedGithubLink,
         },
       },
     ]);

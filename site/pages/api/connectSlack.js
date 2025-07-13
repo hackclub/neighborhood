@@ -1,5 +1,6 @@
 import Airtable from "airtable";
 import { WebClient } from "@slack/web-api";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
@@ -38,14 +39,17 @@ export default async function handler(req, res) {
     });
   }
 
+  const cleanedToken = cleanString(token);
+  const cleanedSlackId = cleanString(slackId);
+
   try {
     // Find the user record by token
     let userRecords;
     try {
-      console.log("Looking up user in neighbors with token:", token);
+      console.log("Looking up user in neighbors with token:", cleanedToken);
       userRecords = await base("neighbors")
         .select({
-          filterByFormula: `{token} = '${token}'`,
+          filterByFormula: `{token} = '${cleanedToken}'`,
           maxRecords: 1,
         })
         .firstPage();
@@ -66,10 +70,10 @@ export default async function handler(req, res) {
     }
 
     if (userRecords.length === 0) {
-      console.log("No user found for token:", token);
+      console.log("No user found for token:", cleanedToken);
       return res
         .status(404)
-        .json({ message: "User not found for provided token", token });
+        .json({ message: "User not found for provided token", token: cleanedToken });
     }
 
     const userId = userRecords[0].id;
@@ -80,7 +84,7 @@ export default async function handler(req, res) {
     const web = new WebClient(process.env.SLACK_BOT_TOKEN);
     let slackUserInfo;
     try {
-      const response = await web.users.info({ user: slackId });
+      const response = await web.users.info({ user: cleanedSlackId });
       if (response.ok && response.user) {
         slackUserInfo = response.user;
         console.log("Slack user info retrieved:", {
@@ -98,10 +102,10 @@ export default async function handler(req, res) {
     // Update or create the Slack record in #neighborhoodSlackMembers
     let slackRecords;
     try {
-      console.log("Looking up Slack record with Slack ID:", slackId);
+      console.log("Looking up Slack record with Slack ID:", cleanedSlackId);
       slackRecords = await base("#neighborhoodSlackMembers")
         .select({
-          filterByFormula: `{Slack ID} = '${slackId}'`,
+          filterByFormula: `{Slack ID} = '${cleanedSlackId}'`,
           maxRecords: 1,
         })
         .firstPage();
@@ -125,7 +129,7 @@ export default async function handler(req, res) {
       // Prepare fields using Slack API data if available
       const fields = {
         Email: userEmail,
-        "Slack ID": slackId,
+        "Slack ID": cleanedSlackId,
         neighbors: [userId],
       };
 

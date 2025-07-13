@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
@@ -38,9 +39,15 @@ export default async function handler(req, res) {
   const { email, otp } = req.body;
   const ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || 'unknown';
 
+  if (!email) {
+    return res.status(400).json({ message: "Email is required" });
+  }
+
+  const cleanedEmail = cleanString(email);
+
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!email || !emailRegex.test(email)) {
-    console.log("Invalid email format:", email);
+  if (!cleanedEmail || !emailRegex.test(cleanedEmail)) {
+    console.log("Invalid email format:", cleanedEmail);
     return res.status(400).json({ message: "Invalid email format" });
   }
 
@@ -50,14 +57,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Invalid OTP format" });
   }
 
-  if (!istoofast(email, ip)) {
-    console.log("Rate limit exceeded for:", email, ip);
+  if (!istoofast(cleanedEmail, ip)) {
+    console.log("Rate limit exceeded for:", cleanedEmail, ip);
     return res.status(429).json({ message: "Too many attempts" });
   }
 
-  if (!email || !otp) {
+  if (!cleanedEmail || !otp) {
     console.log("email and otp are required");
-    console.log("email", email);
+    console.log("email", cleanedEmail);
     console.log("otp", otp);
     return res.status(400).json({ message: "Email and OTP are required" });
   }
@@ -67,14 +74,14 @@ export default async function handler(req, res) {
 
     const otpRecords = await base("OTP")
       .select({
-        filterByFormula: `AND({Email} = '${email}', {isUsed} = 0)`,
+        filterByFormula: `AND({Email} = '${cleanedEmail}', {isUsed} = 0)`,
         sort: [{ field: "createdAt", direction: "desc" }],
         maxRecords: 1,
       })
       .firstPage();
 
     if (otpRecords.length === 0) {
-      console.log("No valid OTP found for email:", email);
+      console.log("No valid OTP found for email:", cleanedEmail);
       return res.status(400).json({ message: "No valid OTP found" });
     }
 
@@ -107,13 +114,13 @@ export default async function handler(req, res) {
 
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{email} = '${email}'`,
+        filterByFormula: `{email} = '${cleanedEmail}'`,
         maxRecords: 1,
       })
       .firstPage();
 
     if (userRecords.length === 0) {
-      console.log("User not found for email:", email);
+      console.log("User not found for email:", cleanedEmail);
       return res.status(404).json({ message: "User not found" });
     }
 

@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -12,11 +13,11 @@ export default async function handler(req, res) {
 
   const { token, moveInDate, moveOutDate, isSpecialDates } = req.body;
 
-  // sanitize inputs with regex
+  const cleanedToken = cleanString(token);
 
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/; // YYYY-MM-DD format
-  if (!tokenRegex.test(token)) {
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid token format" });
   }
   if (!dateRegex.test(moveInDate) || !dateRegex.test(moveOutDate)) {
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
       .json({ message: "Invalid date format. Use YYYY-MM-DD" });
   }
 
-  if (!token || !moveInDate || !moveOutDate) {
+  if (!cleanedToken || !moveInDate || !moveOutDate) {
     return res
       .status(400)
       .json({ message: "Token, move-in date, and move-out date are required" });
@@ -35,7 +36,7 @@ export default async function handler(req, res) {
     // Find the user by token
     const records = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();

@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -71,11 +72,11 @@ export default async function handler(req, res) {
     // Create the comment with the current timestamp
     const now = new Date();
     // Sanitize content before storing
-    const sanitizedContent = content.trim().substring(0, 3000);
+    const cleanedContent = cleanString(content).trim().substring(0, 3000);
     const newRecord = await base("Comments").create([
       {
         fields: {
-          content: sanitizedContent,
+          content: cleanedContent,
           post: [postId], // Ensure this is always an array
           sentFrom: [neighborId], // Also ensure this is an array for linked records
         },

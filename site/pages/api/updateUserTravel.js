@@ -1,4 +1,5 @@
 import Airtable from "airtable";
+import { cleanString } from "../../lib/airtable.js";
 
 // Initialize Airtable
 const base = new Airtable({
@@ -30,6 +31,10 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
+  const cleanedToken = cleanString(token);
+  const cleanedCountry = cleanString(country);
+  const cleanedAirport = cleanString(airport);
+
   // Sanitize all of the inputs with regex
   const countryRegex = /^[A-Za-z\s]+$/; // Allow letters and spaces
   const airportRegex = /^[A-Za-z0-9\s\-]+$/; // Allow letters, numbers, spaces, and hyphens
@@ -38,7 +43,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "hasVisa must be a boolean" });
   }
 
-  if (!countryRegex.test(country) || !airportRegex.test(airport)) {
+  if (!cleanedCountry || !countryRegex.test(cleanedCountry) || !cleanedAirport || !airportRegex.test(cleanedAirport)) {
     return res.status(400).json({ message: "Invalid input format" });
   }
   if (typeof hasVisa !== "boolean") {
@@ -46,7 +51,7 @@ export default async function handler(req, res) {
   }
   // Ensure the token is a valid format
   const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
-  if (!tokenRegex.test(token)) {
+  if (!cleanedToken || !tokenRegex.test(cleanedToken)) {
     return res.status(400).json({ message: "Invalid token format" });
   }
 
@@ -54,7 +59,7 @@ export default async function handler(req, res) {
     // Find the user by token
     const userRecords = await base("neighbors")
       .select({
-        filterByFormula: `{token} = '${token}'`,
+        filterByFormula: `{token} = '${cleanedToken}'`,
         maxRecords: 1,
       })
       .firstPage();
@@ -73,9 +78,9 @@ export default async function handler(req, res) {
       {
         id: userId,
         fields: {
-          country,
+          country: cleanedCountry,
           hasVisa,
-          airport,
+          airport: cleanedAirport,
         },
       },
     ]);
@@ -83,9 +88,9 @@ export default async function handler(req, res) {
     // Optionally, return the updated fields
     return res.status(200).json({
       success: true,
-      country,
+      country: cleanedCountry,
       hasVisa,
-      airport,
+      airport: cleanedAirport,
     });
   } catch (error) {
     console.error("Error updating user travel info:", error);
