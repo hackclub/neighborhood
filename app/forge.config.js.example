@@ -15,15 +15,13 @@ module.exports = {
       "^/.next",
       "^/.vercel",
       "^/out",
-      ".map$"
+      ".map$",
+      "^/notarization.log",
+      "^/notarization_log.json",
+      "^/myAirtableSetup.txt",
+      "^/electron-builder.yaml",
+      "^/scripts"
     ],
-    osxSign: {
-      identity: "Developer ID Application: Thomas Stubblefield (2H4LMN3ZLG)",
-      hardenedRuntime: true,
-      entitlements: path.resolve(__dirname, 'entitlements.plist'),
-      entitlementsInherit: path.resolve(__dirname, 'entitlements.plist'),
-      'gatekeeper-assess': false
-    },
     extraResource: [path.resolve(__dirname, 'entitlements-minimal.plist')]
   },
   rebuildConfig: {},
