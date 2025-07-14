@@ -6,14 +6,9 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY,
 }).base(process.env.AIRTABLE_BASE_ID);
 
+// Consistency!
 const generateToken = () => {
-  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 6; i++) {
-    const randomIndex = crypto.randomInt(0, charset.length);
-    token += charset[randomIndex];
-  }
-  return token;
+  return crypto.randomBytes(40).toString("base64url");
 };
 
 const generateOTP = () => {
@@ -25,6 +20,7 @@ const generateOTP = () => {
   }
   return otp;
 };
+
 const sendOTPEmail = async (email, otp) => {
   const url = "https://app.loops.so/api/v1/transactional";
   const payload = {
