@@ -38,4 +38,11 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+notarization.log
+notarization_log.json
+myAirtableSetup.txt
+electron-builder.yaml
+scripts/
 next-env.d.ts
+
+forge.config.js

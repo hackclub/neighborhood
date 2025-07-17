@@ -12,6 +12,10 @@ function sanitizeOTP(otpString) {
   return otpString.toString().replace(/[^a-zA-Z0-9]/g, "");
 }
 
+const generateToken = () => {
+  return crypto.randomBytes(40).toString("base64url");
+};
+
 function istoofast(email, ip) {
   const now = Date.now();
   const key = `${email}_${ip}`;
@@ -120,13 +124,18 @@ export default async function handler(req, res) {
       .firstPage();
 
     if (userRecords.length === 0) {
-      console.log("User not found for email:", cleanedEmail);
       return res.status(404).json({ message: "User not found" });
     }
 
+    const newToken = generateToken();
+
+    await base(process.env.AIRTABLE_TABLE_ID).update(userRecords[0].id, { // just "neighbors"
+      token: newToken,
+    });
+
     return res.status(200).json({
       message: "OTP verified successfully",
-      token: userRecords[0].fields.token,
+      token: newToken,
     });
   } catch (error) {
     console.error("Airtable Error:", error);

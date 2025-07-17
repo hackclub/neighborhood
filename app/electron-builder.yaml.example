@@ -13,11 +13,11 @@ mac:
   hardenedRuntime: true
   entitlements: "entitlements.plist"
   entitlementsInherit: "entitlements.plist"
-  identity: "Developer ID Application: Thomas Stubblefield (2H4LMN3ZLG)"
+  identity: "INSERT_HERE"
   gatekeeperAssess: false
   enableKeychain: false
   useCacheDirectories: true
   notarize:
-    teamId: "2H4LMN3ZLG"
-    appleId: "tstubblefield487@icloud.com"
-    appleIdPassword: "bdhs-blrj-alnz-magr" 
+    teamId: "INSERT_HERE"
+    appleId: "INSERT_HERE"
+    appleIdPassword: "INSERT_HERE"
