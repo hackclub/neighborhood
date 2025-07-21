@@ -43,11 +43,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Email is required" });
   }
 
-  const cleanedEmail = cleanString(email);
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!cleanedEmail || !emailRegex.test(cleanedEmail)) {
-    console.log("Invalid email format:", cleanedEmail);
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(email)) {
+    console.log("Invalid email format:", email);
     return res.status(400).json({ message: "Invalid email format" });
   }
 
@@ -57,14 +55,14 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Invalid OTP format" });
   }
 
-  if (!istoofast(cleanedEmail, ip)) {
-    console.log("Rate limit exceeded for:", cleanedEmail, ip);
+  if (!istoofast(email, ip)) {
+    console.log("Rate limit exceeded for:", email, ip);
     return res.status(429).json({ message: "Too many attempts" });
   }
 
-  if (!cleanedEmail || !otp) {
+  if (!email || !otp) {
     console.log("email and otp are required");
-    console.log("email", cleanedEmail);
+    console.log("email", email);
     console.log("otp", otp);
     return res.status(400).json({ message: "Email and OTP are required" });
   }
@@ -74,14 +72,14 @@ export default async function handler(req, res) {
 
     const otpRecords = await base("OTP")
       .select({
-        filterByFormula: `AND({Email} = '${cleanedEmail}', {isUsed} = 0)`,
+        filterByFormula: `AND({Email} = '${email}', {isUsed} = 0)`,
         sort: [{ field: "createdAt", direction: "desc" }],
         maxRecords: 1,
       })
       .firstPage();
 
     if (otpRecords.length === 0) {
-      console.log("No valid OTP found for email:", cleanedEmail);
+      console.log("No valid OTP found for email:", email);
       return res.status(400).json({ message: "No valid OTP found" });
     }
 
@@ -114,7 +112,7 @@ export default async function handler(req, res) {
 
     const userRecords = await base(process.env.AIRTABLE_TABLE_ID)
       .select({
-        filterByFormula: `{email} = '${cleanedEmail}'`,
+        filterByFormula: `{email} = '${email}'`,
         maxRecords: 1,
       })
       .firstPage();

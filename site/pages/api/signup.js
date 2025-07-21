@@ -65,18 +65,13 @@ export default async function handler(req, res) {
     return res.status(400).json({ message: "Email is required" });
   }
 
-  const cleanedEmail = cleanString(email);
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-  if (typeof cleanedEmail !== "string" || cleanedEmail.length > 254) {
+  if (!emailRegex.test(email)) {
     return res.status(400).json({ message: "Invalid email format" });
   }
 
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(cleanedEmail)) {
-    return res.status(400).json({ message: "Invalid email format" });
-  }
-
-  const normalizedEmail = cleanedEmail.trim().toLowerCase();
+  const normalizedEmail = email.trim().toLowerCase();
 
   try {
     const records = await base(process.env.AIRTABLE_TABLE_ID)
