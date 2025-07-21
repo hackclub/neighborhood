@@ -5,6 +5,9 @@ const base = new Airtable({
   apiKey: process.env.AIRTABLE_API_KEY
 }).base(process.env.AIRTABLE_BASE_ID);
 
+// Validation regex patterns
+const tokenRegex = /^[A-Za-z0-9_-]{10,}$/;
+
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -27,6 +30,10 @@ export default async function handler(req, res) {
   
   if (!token) {
     return res.status(401).json({ message: 'No token provided' });
+  }
+
+  if(!tokenRegex.test(token)) {
+    return res.status(400).json({ message: 'Invalid token format' });
   }
 
   try {
