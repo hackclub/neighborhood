@@ -15,5 +15,5 @@ There's no capacity limit or selection process. Every week in San Francisco, you
 I'll see you on the kickoff call Friday May 9th 7:30 PM EST 📆
 (RSVP by signing up on the site)
 
-~Thomas
-in life we are always learning
+~Thomas \
+_in life we are always learning_
