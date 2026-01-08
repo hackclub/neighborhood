@@ -1,7 +1,7 @@
 // neighborhood/site/pages/api/proxy.js
 import { createReadStream } from "stream";
 import { Readable } from "stream";
-import fetch from "node-fetch";
+// No need to import fetch - it's built-in in Next.js 16+
 import { URL } from "url";
 
 export default async function handler(req, res) {
@@ -81,7 +81,7 @@ export default async function handler(req, res) {
     // Forward status and headers from the response
     res.statusCode = response.status;
 
-    for (const [key, value] of Object.entries(response.headers.raw())) {
+    for (const [key, value] of response.headers.entries()) {
       // Skip headers that might cause issues
       if (
         !["content-encoding", "content-length", "transfer-encoding"].includes(
@@ -93,7 +93,7 @@ export default async function handler(req, res) {
     }
 
     // Get response data and send it back
-    const responseData = await response.buffer();
+    const responseData = Buffer.from(await response.arrayBuffer());
     return res.send(responseData);
   } catch (err) {
     console.error("CORS Proxy Error:", err);
