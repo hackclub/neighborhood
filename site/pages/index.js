@@ -340,7 +340,7 @@ export default function Home() {
                       opacity: 0.6
                     }}
                   >
-                   {isSubmitting ? 'Joining...' : 'Join Us In San Francisco'}
+                   {isSubmitting ? 'Joining...' : 'Program is closed'}
                   </button>
                   {error && (
                     <p style={{
