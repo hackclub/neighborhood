@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { LoginComponentOS } from "/components/os/loginComponentOS"
-import { AppSelectionDropup } from "/components/os/AppSelectionDropup"
-import { BottomBar } from "/components/os/BottomBar"
-import MissionView from "/components/os/MissionView"
-import LowerHaightView from "/components/os/LowerHaightView"
-import SunsetView from "/components/os/SunsetView"
+import { LoginComponentOS } from "@/components/os/loginComponentOS"
+import { AppSelectionDropup } from "@/components/os/AppSelectionDropup"
+import { BottomBar } from "@/components/os/BottomBar"
+import MissionView from "@/components/os/MissionView"
+import LowerHaightView from "@/components/os/LowerHaightView"
+import SunsetView from "@/components/os/SunsetView"
 
 export default function PostView() {
 
